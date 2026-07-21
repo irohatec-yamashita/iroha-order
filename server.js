@@ -16,6 +16,9 @@ const { appendEvent, createConfirmedOrder, ordersForTable } = require("./lib/sto
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
+const voiceModel = process.env.VOICE_MODEL || "gpt-4o-mini-tts-2025-12-15";
+const voiceName = process.env.VOICE_NAME || "marin";
+const speechCache = new Map();
 const menuPath = path.join(__dirname, "data", "menu.json");
 const contextPath = path.join(__dirname, "data", "restaurant.json");
 const chatEventTypes = new Set(["guest_seated", "order_confirmed", "raise_hand", "checkout_requested", "check_confirmed", "language_changed"]);
@@ -79,6 +82,15 @@ app.post("/api/speech", async (req, res) => {
     if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
     if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Voice service is not configured." });
 
+    const cacheKey = `${lang}:${input}`;
+    const cached = speechCache.get(cacheKey);
+    if (cached) {
+      res.set("Content-Type", "audio/mpeg");
+      res.set("Cache-Control", "private, max-age=3600");
+      res.set("X-Iroha-Voice", voiceName);
+      return res.send(cached);
+    }
+
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -86,12 +98,12 @@ app.post("/api/speech", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: process.env.VOICE_MODEL || "gpt-4o-mini-tts",
-        voice: process.env.VOICE_NAME || "marin",
+        model: voiceModel,
+        voice: voiceName,
         input,
         instructions: lang === "ja"
-          ? "自然で温かい日本の居酒屋スタッフとして、親しみを込めて簡潔に話してください。落ち着いた速さで、過度に演技しないでください。"
-          : "Speak naturally like a warm, concise restaurant host at a relaxed pace without overacting.",
+          ? "毎回まったく同じ一人の居酒屋スタッフとして、声質・年齢感・話し方を変えずに話してください。自然で温かく、落ち着いた速さで、過度に演技しないでください。"
+          : "Always speak as the exact same single restaurant host. Keep the voice identity, perceived age, accent, and delivery consistent. Be warm, natural, concise, and do not overact.",
         response_format: "mp3"
       })
     });
@@ -100,8 +112,11 @@ app.post("/api/speech", async (req, res) => {
       return res.status(502).json({ error: "Voice generation failed." });
     }
     const audio = Buffer.from(await response.arrayBuffer());
+    speechCache.set(cacheKey, audio);
+    if (speechCache.size > 64) speechCache.delete(speechCache.keys().next().value);
     res.set("Content-Type", response.headers.get("content-type") || "audio/mpeg");
-    res.set("Cache-Control", "no-store");
+    res.set("Cache-Control", "private, max-age=3600");
+    res.set("X-Iroha-Voice", voiceName);
     res.send(audio);
   } catch (error) {
     console.error("Speech request failed:", error);

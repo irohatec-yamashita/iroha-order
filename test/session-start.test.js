@@ -47,6 +47,8 @@ global.fetch = async (url, options) => {
   const request = JSON.parse(options.body);
   modelRequests.push(request);
   assert.equal(request.model, "gpt-5.6");
+  assert.equal(request.reasoning.effort, "none");
+  assert.equal(request.text.verbosity, "low");
   assert.match(request.instructions, /demo-ui\.html/);
   assert.match(request.instructions, /Do not jump directly to drinks/);
   const reply = modelReplies.shift();
@@ -135,7 +137,13 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   const speech = await request(server, { method: "POST", path: "/api/speech", body: { text: greeting.text, lang: "ja" } });
   assert.equal(speech.status, 200);
   assert.match(speech.headers["content-type"], /^audio\/mpeg/);
+  assert.equal(speech.headers["x-iroha-voice"], "marin");
+  assert.equal(speechRequests[0].model, "gpt-4o-mini-tts-2025-12-15");
   assert.equal(speechRequests[0].voice, "marin");
+
+  const cachedSpeech = await request(server, { method: "POST", path: "/api/speech", body: { text: greeting.text, lang: "ja" } });
+  assert.equal(cachedSpeech.status, 200);
+  assert.equal(speechRequests.length, 1);
 
   assert.equal(modelRequests.length, 4);
   assert.match(JSON.stringify(modelRequests[1].input), /2名です/);
