@@ -189,7 +189,7 @@ async function requestAI({ userText, uiEvent } = {}) {
     const reply = await api("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ table, lang, sessionState: sessionState(), messages: messages.slice(-28), uiEvent })
+      body: JSON.stringify({ table, lang, sessionState: sessionState(), messages: messages.slice(-28), ...(uiEvent ? { type: uiEvent } : {}) })
     });
     hideTyping();
     if (reply.text) {

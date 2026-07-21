@@ -9,6 +9,7 @@ const { appendEvent, createConfirmedOrder, ordersForTable } = require("./lib/sto
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 const menuPath = path.join(__dirname, "data", "menu.json");
+const chatEventTypes = new Set(["guest_seated", "order_confirmed", "raise_hand", "check_confirmed", "language_changed"]);
 
 function readMenu() {
   return JSON.parse(fs.readFileSync(menuPath, "utf8"));
@@ -30,6 +31,13 @@ function safeMessages(messages) {
   });
 }
 
+function safeChatEvent(type, uiEvent) {
+  if (type && uiEvent && type !== uiEvent) throw new Error("Conflicting chat event types.");
+  const event = type || uiEvent;
+  if (event && !chatEventTypes.has(event)) throw new Error("Unsupported chat event.");
+  return event;
+}
+
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/api/menu", (_req, res) => {
@@ -44,12 +52,11 @@ app.get("/api/menu", (_req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const { table, lang = "ja", sessionState = {}, messages, uiEvent } = req.body || {};
+    const { table, lang = "ja", sessionState = {}, messages, type, uiEvent } = req.body || {};
     if (!validTable(table)) throw new Error("A valid table number is required.");
     if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
-    if (uiEvent && !["guest_seated", "order_confirmed", "raise_hand", "check_confirmed", "language_changed"].includes(uiEvent)) {
-      throw new Error("Unsupported UI event.");
-    }
+    const chatEvent = safeChatEvent(type, uiEvent);
+    const chatMessages = messages === undefined && chatEvent === "guest_seated" ? [] : safeMessages(messages);
     const confirmed = ordersForTable(table);
     const reply = await chatWithWaiter({
       menu: readMenu(),
@@ -60,8 +67,8 @@ app.post("/api/chat", async (req, res) => {
         confirmedOrders: confirmed.orders,
         confirmedTotal: confirmed.total
       },
-      messages: safeMessages(messages),
-      uiEvent
+      messages: chatMessages,
+      uiEvent: chatEvent
     });
     res.json(reply);
   } catch (error) {
@@ -103,6 +110,12 @@ app.post("/api/events", (req, res) => {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-app.listen(port, () => {
-  console.log(`IROHA Order is running at http://localhost:${port}`);
-});
+function startServer(listenPort = port) {
+  return app.listen(listenPort, () => {
+    console.log(`IROHA Order is running at http://localhost:${listenPort}`);
+  });
+}
+
+if (require.main === module) startServer();
+
+module.exports = { app, startServer };
