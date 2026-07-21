@@ -81,7 +81,7 @@ global.fetch = async (url, options) => {
 
 const { app, serviceAnswerFor } = require("../server");
 const { resetSessions } = require("../lib/session");
-const { markOrdersCheckoutRequested } = require("../lib/store");
+const { activeOrdersForTable, markOrdersCheckoutRequested } = require("../lib/store");
 
 function request(server, { method = "GET", path, body }) {
   const address = server.address();
@@ -189,4 +189,13 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   assert.equal(checkoutRecords[0].checkoutRequestedAt, "2026-07-21T00:00:00.000Z");
   assert.equal(checkoutRecords[1].status, "checkout_requested");
   assert.equal(checkoutRecords[2].status, "confirmed");
+
+  const activeAfterLegacyCheck = activeOrdersForTable([
+    { orderId: "before", table: "5", status: "confirmed", time: "2026-07-21T09:00:00.000Z" },
+    { orderId: "after", table: "5", status: "confirmed", time: "2026-07-21T11:00:00.000Z" },
+    { orderId: "other", table: "6", status: "confirmed", time: "2026-07-21T11:00:00.000Z" }
+  ], [
+    { table: "5", type: "check", time: "2026-07-21T10:00:00.000Z" }
+  ], "5");
+  assert.deepEqual(activeAfterLegacyCheck.map((order) => order.orderId), ["after"]);
 });
