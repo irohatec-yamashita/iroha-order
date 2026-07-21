@@ -134,38 +134,48 @@ function addChips(labels) {
 
 function removeChips() { if (activeChips) activeChips.remove(); activeChips = null; }
 
-const SPEECH_READINGS = [["何名様", "なんめいさま"], ["生ビール", "なまビール"], ["地魚", "じざかな"], ["人前", "にんまえ"], ["瀬戸内", "せとうち"]];
-const VOICE_PRIORITY = {
-  ja: ["Nanami Online", "Keita Online", "Nanami", "Google 日本語", "Kyoko", "Ayumi"],
-  en: ["Aria Online", "Jenny Online", "Guy Online", "Google US English", "Samantha", "Aria"]
-};
-let cachedVoices = [];
-function loadVoices() { if ("speechSynthesis" in window) cachedVoices = speechSynthesis.getVoices(); }
-loadVoices();
-if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = loadVoices;
-function pickVoice() {
-  const candidates = cachedVoices.filter((voice) => voice.lang.toLowerCase().startsWith(lang));
-  for (const key of VOICE_PRIORITY[lang]) {
-    const voice = candidates.find((candidate) => candidate.name.includes(key));
-    if (voice) return voice;
+let currentAudio = null;
+let speechController = null;
+function stopSpeech() {
+  if (speechController) speechController.abort();
+  speechController = null;
+  if (currentAudio) {
+    currentAudio.pause();
+    if (currentAudio.src.startsWith("blob:")) URL.revokeObjectURL(currentAudio.src);
   }
-  return candidates[0] || null;
+  currentAudio = null;
 }
-function speak(text) {
-  if (!ttsOn || !("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  let clean = String(text).replace(/[🖐🍺🍽🍨💴🧾📖🌐🔊🔇🍶✕→（）\[\]［］]/g, " ").replace(/\s+/g, " ").trim();
+async function speak(text) {
+  if (!ttsOn) return;
+  stopSpeech();
+  const clean = String(text).replace(/<[^>]+>/g, " ").replace(/[🖐🍺🍽🍨💴🧾📖🌐🔊🔇🍶✕→（）\[\]［］]/g, " ").replace(/\s+/g, " ").trim();
   if (!clean) return;
-  if (lang === "ja") for (const [from, to] of SPEECH_READINGS) clean = clean.split(from).join(to);
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = lang === "ja" ? "ja-JP" : "en-US";
-  utterance.rate = 1;
-  utterance.voice = pickVoice();
-  speechSynthesis.speak(utterance);
+  const controller = new AbortController();
+  speechController = controller;
+  try {
+    const response = await fetch("/api/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: clean, lang }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Voice generation failed.");
+    const url = URL.createObjectURL(await response.blob());
+    if (controller.signal.aborted || !ttsOn) { URL.revokeObjectURL(url); return; }
+    const audio = new Audio(url);
+    currentAudio = audio;
+    audio.onended = () => { if (currentAudio === audio) currentAudio = null; URL.revokeObjectURL(url); };
+    audio.onerror = () => { if (currentAudio === audio) currentAudio = null; URL.revokeObjectURL(url); };
+    await audio.play();
+  } catch (error) {
+    if (error.name !== "AbortError") console.warn("OpenAI voice unavailable:", error.message);
+  } finally {
+    if (speechController === controller) speechController = null;
+  }
 }
 function toggleTTS() {
   ttsOn = !ttsOn;
-  if (!ttsOn && "speechSynthesis" in window) speechSynthesis.cancel();
+  if (!ttsOn) stopSpeech();
   $("ttsBtn").textContent = ttsOn ? t().ttsOn : t().ttsOff;
   $("ttsBtn").classList.toggle("off", !ttsOn);
 }
@@ -454,7 +464,7 @@ async function startSession(selectedLang) {
 }
 async function restartDemo() {
   if (!sessionStarted || busy) return;
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  stopSpeech();
   chat.innerHTML = "";
   messages = [];
   pendingProposal = null;

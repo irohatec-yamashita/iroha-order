@@ -8,6 +8,7 @@ process.env.SHEETS_WEBHOOK_URL = "";
 
 const realFetch = global.fetch;
 const modelRequests = [];
+const speechRequests = [];
 const modelReplies = [
   {
     text: "いらっしゃいませ。本日は何名様でご来店ですか？",
@@ -33,6 +34,15 @@ const modelReplies = [
 ];
 
 global.fetch = async (url, options) => {
+  if (url === "https://api.openai.com/v1/audio/speech") {
+    const request = JSON.parse(options.body);
+    speechRequests.push(request);
+    return {
+      ok: true,
+      headers: { get: () => "audio/mpeg" },
+      arrayBuffer: async () => Uint8Array.from([73, 68, 51]).buffer
+    };
+  }
   assert.equal(url, "https://api.openai.com/v1/responses");
   const request = JSON.parse(options.body);
   modelRequests.push(request);
@@ -72,7 +82,7 @@ function request(server, { method = "GET", path, body }) {
       let text = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => { text += chunk; });
-      res.on("end", () => resolve({ status: res.statusCode, text }));
+    res.on("end", () => resolve({ status: res.statusCode, text, headers: res.headers }));
     });
     req.on("error", reject);
     if (payload) req.write(payload);
@@ -121,6 +131,11 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   assert.equal(proposal.proposal.total, 1700);
   assert.deepEqual(proposal.proposal.items, [{ id: "beer", qty: 2 }, { id: "lemonsour", qty: 1 }]);
   assert.equal(proposal.sessionState.stage, "order_confirmation");
+
+  const speech = await request(server, { method: "POST", path: "/api/speech", body: { text: greeting.text, lang: "ja" } });
+  assert.equal(speech.status, 200);
+  assert.match(speech.headers["content-type"], /^audio\/mpeg/);
+  assert.equal(speechRequests[0].voice, "marin");
 
   assert.equal(modelRequests.length, 4);
   assert.match(JSON.stringify(modelRequests[1].input), /2名です/);

@@ -71,6 +71,44 @@ app.get("/api/menu", (_req, res) => {
   }
 });
 
+app.post("/api/speech", async (req, res) => {
+  try {
+    const { text, lang = "ja" } = req.body || {};
+    const input = typeof text === "string" ? text.trim() : "";
+    if (!input || input.length > 2000) throw new Error("Invalid speech text.");
+    if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
+    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Voice service is not configured." });
+
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.VOICE_MODEL || "gpt-4o-mini-tts",
+        voice: process.env.VOICE_NAME || "marin",
+        input,
+        instructions: lang === "ja"
+          ? "自然で温かい日本の居酒屋スタッフとして、親しみを込めて簡潔に話してください。落ち着いた速さで、過度に演技しないでください。"
+          : "Speak naturally like a warm, concise restaurant host at a relaxed pace without overacting.",
+        response_format: "mp3"
+      })
+    });
+    if (!response.ok) {
+      console.error("Voice generation failed:", response.status, await response.text());
+      return res.status(502).json({ error: "Voice generation failed." });
+    }
+    const audio = Buffer.from(await response.arrayBuffer());
+    res.set("Content-Type", response.headers.get("content-type") || "audio/mpeg");
+    res.set("Cache-Control", "no-store");
+    res.send(audio);
+  } catch (error) {
+    console.error("Speech request failed:", error);
+    res.status(400).json({ error: "Unable to generate speech." });
+  }
+});
+
 app.post("/api/chat", async (req, res) => {
   try {
     const { table, lang = "ja", message, messages, type, uiEvent } = req.body || {};
