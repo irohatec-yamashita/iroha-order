@@ -1,0 +1,16 @@
+{
+  "restaurant": "居酒屋 いろは",
+  "taxNote": "prices include 10% tax",
+  "items": [
+    {"id":"beer","name":"生ビール","en":"Draft Beer","cat":"drink","price":600,"aliases":["ナマ","生","生ビ","ビール"],"desc":"キンキンに冷えた生ビール","ingredients":[],"soldOut":false},
+    {"id":"lemonsour","name":"レモンサワー","en":"Lemon Sour","cat":"drink","price":500,"aliases":["レモン"],"desc":"自家製レモンの酸味","ingredients":["lemon"],"soldOut":false},
+    {"id":"highball","name":"ハイボール","en":"Highball","cat":"drink","price":550,"aliases":["ハイボ"],"desc":"すっきり辛口","ingredients":[],"soldOut":false},
+    {"id":"oolong","name":"ウーロン茶","en":"Oolong Tea","cat":"drink","price":300,"aliases":["ウーロン","お茶"],"desc":"","ingredients":[],"soldOut":false},
+    {"id":"sashimi","name":"刺身盛り合わせ","en":"Sashimi Platter","cat":"food","price":800,"aliases":["盛り合わせ","刺身","盛合せ"],"desc":"瀬戸内の地魚（鯛・イカ・アジ）","ingredients":["fish"],"soldOut":false,"perPerson":true,"recommended":true},
+    {"id":"karaage","name":"唐揚げ","en":"Fried Chicken","cat":"food","price":600,"aliases":["からあげ","鶏唐"],"desc":"外はカリッと中はジューシー","ingredients":["chicken"],"soldOut":false,"recommended":true},
+    {"id":"potatosalad","name":"ポテトサラダ","en":"Potato Salad","cat":"food","price":400,"aliases":["ポテサラ"],"desc":"","ingredients":["potato","egg","cucumber"],"soldOut":true},
+    {"id":"edamame","name":"枝豆","en":"Edamame","cat":"food","price":350,"aliases":[],"desc":"","ingredients":["soybean"],"soldOut":false},
+    {"id":"yakitori","name":"焼き鳥盛り","en":"Yakitori Platter","cat":"food","price":700,"aliases":["焼き鳥","やきとり"],"desc":"タレ・塩から選べる5本盛り","ingredients":["chicken"],"soldOut":false},
+    {"id":"dashimaki","name":"だし巻き卵","en":"Dashimaki Omelet","cat":"food","price":450,"aliases":["だし巻き","卵焼き"],"desc":"出汁たっぷりふわふわ","ingredients":["egg"],"soldOut":false}
+  ]
+}
