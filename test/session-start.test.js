@@ -4,27 +4,59 @@ const test = require("node:test");
 
 process.env.OPENAI_API_KEY = "test-key";
 process.env.MODEL = "gpt-5.6";
+process.env.SHEETS_WEBHOOK_URL = "";
 
 const realFetch = global.fetch;
+const modelRequests = [];
+const modelReplies = [
+  {
+    text: "いらっしゃいませ。本日は何名様でご来店ですか？",
+    chips: ["1名です", "2名です", "3名です", "4名です"],
+    session: { stage: "party_size", partySize: null, firstVisit: null, dislikes: [], dislikesAsked: false },
+    highlightRaiseHand: false
+  },
+  {
+    text: "2名様ですね、ありがとうございます。当店は初めてですか？",
+    chips: ["はい、初めてです", "いいえ、来たことがあります"],
+    session: { stage: "first_visit", partySize: 2, firstVisit: null, dislikes: [], dislikesAsked: false },
+    highlightRaiseHand: false
+  },
+  {
+    text: "初めてのご来店ありがとうございます。ご注文はこの画面で確定し、お会計はレジです。お困りの際やアレルギーのご相談は手を挙げるボタンでスタッフをお呼びください。お飲み物は何にされますか？",
+    chips: ["生ビールを2つ", "飲み物を教えて"],
+    session: { stage: "drinks", partySize: 2, firstVisit: true, dislikes: [], dislikesAsked: false },
+    highlightRaiseHand: false
+  },
+  {
+    tool: { items: [{ id: "beer", qty: 2 }, { id: "lemonsour", qty: 1 }], note: "" }
+  }
+];
+
 global.fetch = async (url, options) => {
   assert.equal(url, "https://api.openai.com/v1/responses");
   const request = JSON.parse(options.body);
+  modelRequests.push(request);
   assert.equal(request.model, "gpt-5.6");
-  assert.match(request.instructions, /UI event: guest_seated/);
-  assert.match(String(request.input), /guest has just been seated/i);
+  assert.match(request.instructions, /demo-ui\.html/);
+  assert.match(request.instructions, /Do not jump directly to drinks/);
+  const reply = modelReplies.shift();
+  assert.ok(reply, "Unexpected additional model request");
+  if (reply.tool) {
+    return {
+      ok: true,
+      json: async () => ({
+        output: [{ type: "function_call", name: "propose_order", arguments: JSON.stringify(reply.tool) }]
+      })
+    };
+  }
   return {
     ok: true,
-    json: async () => ({
-      output_text: JSON.stringify({
-        text: "いらっしゃいませ。何名様でしょうか？",
-        chips: ["1名です", "2名です", "3名です", "4名です"]
-      }),
-      output: []
-    })
+    json: async () => ({ output_text: JSON.stringify(reply), output: [] })
   };
 };
 
 const { app } = require("../server");
+const { resetSessions } = require("../lib/session");
 
 function request(server, { method = "GET", path, body }) {
   const address = server.address();
@@ -48,7 +80,14 @@ function request(server, { method = "GET", path, body }) {
   });
 }
 
-test("opening the guest page can start a GPT greeting without a 400", async (t) => {
+async function chat(server, body) {
+  const response = await request(server, { method: "POST", path: "/api/chat", body });
+  assert.equal(response.status, 200, response.text);
+  return JSON.parse(response.text);
+}
+
+test("guest flow follows demo-ui hospitality stages while replies remain model-generated", async (t) => {
+  resetSessions();
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   t.after(async () => {
@@ -60,14 +99,31 @@ test("opening the guest page can start a GPT greeting without a 400", async (t) 
   assert.equal(page.status, 200);
   assert.match(page.text, /guest\.js/);
 
-  const start = await request(server, {
-    method: "POST",
-    path: "/api/chat",
-    body: { table: "5", lang: "ja", type: "guest_seated", sessionState: {} }
-  });
-  assert.equal(start.status, 200);
-  const reply = JSON.parse(start.text);
-  assert.match(reply.text, /何名様/);
-  assert.deepEqual(reply.chips, ["1名です", "2名です", "3名です", "4名です"]);
-  assert.equal(reply.proposal, null);
+  const greeting = await chat(server, { table: "5", lang: "ja", type: "guest_seated" });
+  assert.match(greeting.text, /何名様/);
+  assert.equal(greeting.sessionState.stage, "party_size");
+  assert.match(greeting.sessionState.sessionId, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(greeting.chips, ["1名です", "2名です", "3名です", "4名です"]);
+
+  const party = await chat(server, { table: "5", lang: "ja", message: "2名です" });
+  assert.match(party.text, /初めてですか/);
+  assert.equal(party.sessionState.partySize, 2);
+  assert.equal(party.sessionState.stage, "first_visit");
+  assert.doesNotMatch(party.text, /お飲み物は何に/);
+
+  const firstVisit = await chat(server, { table: "5", lang: "ja", message: "はい、初めてです" });
+  assert.match(firstVisit.text, /お会計はレジ/);
+  assert.match(firstVisit.text, /お飲み物は何に/);
+  assert.equal(firstVisit.sessionState.firstVisit, true);
+  assert.equal(firstVisit.sessionState.stage, "drinks");
+
+  const proposal = await chat(server, { table: "5", lang: "ja", message: "生ビール2つとレモンサワー1つ" });
+  assert.equal(proposal.proposal.total, 1700);
+  assert.deepEqual(proposal.proposal.items, [{ id: "beer", qty: 2 }, { id: "lemonsour", qty: 1 }]);
+  assert.equal(proposal.sessionState.stage, "order_confirmation");
+
+  assert.equal(modelRequests.length, 4);
+  assert.match(JSON.stringify(modelRequests[1].input), /2名です/);
+  assert.match(JSON.stringify(modelRequests[2].input), /初めてです/);
+  assert.match(modelRequests[2].instructions, /hospitalityProfile/);
 });

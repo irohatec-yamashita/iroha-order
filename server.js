@@ -4,15 +4,28 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { AIConfigurationError, chatWithWaiter } = require("./lib/ai");
+const { mirrorSheetEvent } = require("./lib/sheets");
+const {
+  appendTranscript,
+  applySessionUpdate,
+  beginSession,
+  messagesForTable,
+  sessionForTable
+} = require("./lib/session");
 const { appendEvent, createConfirmedOrder, ordersForTable } = require("./lib/store");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 const menuPath = path.join(__dirname, "data", "menu.json");
-const chatEventTypes = new Set(["guest_seated", "order_confirmed", "raise_hand", "check_confirmed", "language_changed"]);
+const contextPath = path.join(__dirname, "data", "restaurant.json");
+const chatEventTypes = new Set(["guest_seated", "order_confirmed", "raise_hand", "checkout_requested", "check_confirmed", "language_changed"]);
 
 function readMenu() {
   return JSON.parse(fs.readFileSync(menuPath, "utf8"));
+}
+
+function readRestaurantContext() {
+  return JSON.parse(fs.readFileSync(contextPath, "utf8"));
 }
 
 function validTable(value) {
@@ -29,6 +42,14 @@ function safeMessages(messages) {
     if (!content || content.length > 2000) throw new Error("Invalid message content.");
     return { role: message.role, content };
   });
+}
+
+function safeMessage(message) {
+  if (message === undefined || message === null) return null;
+  if (typeof message !== "string") throw new Error("Invalid guest message.");
+  const content = message.trim();
+  if (!content || content.length > 2000) throw new Error("Invalid guest message content.");
+  return content;
 }
 
 function safeChatEvent(type, uiEvent) {
@@ -52,25 +73,67 @@ app.get("/api/menu", (_req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const { table, lang = "ja", sessionState = {}, messages, type, uiEvent } = req.body || {};
+    const { table, lang = "ja", message, messages, type, uiEvent } = req.body || {};
     if (!validTable(table)) throw new Error("A valid table number is required.");
     if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
     const chatEvent = safeChatEvent(type, uiEvent);
-    const chatMessages = messages === undefined && chatEvent === "guest_seated" ? [] : safeMessages(messages);
+    const suppliedMessages = messages === undefined ? [] : safeMessages(messages);
+    let session = chatEvent === "guest_seated" ? beginSession({ table, lang }) : sessionForTable({ table, lang });
+    let guestMessage = safeMessage(message);
+    if (!guestMessage && !chatEvent && suppliedMessages.at(-1)?.role === "user") {
+      guestMessage = suppliedMessages.at(-1).content;
+    }
+    if (!chatEvent && !guestMessage) throw new Error("A guest message or chat event is required.");
+
+    if (guestMessage) {
+      const entry = appendTranscript({ table, role: "user", content: guestMessage });
+      mirrorSheetEvent({ type: "conversation", sessionId: session.sessionId, table, lang, stage: session.stage, ...entry });
+    }
+
+    const menu = readMenu();
     const confirmed = ordersForTable(table);
+    const categoryById = new Map(menu.items.map((item) => [item.id, item.cat]));
+    const hasConfirmedDrink = confirmed.orders.some((order) => order.lines.some((line) => categoryById.get(line.id) === "drink"));
+    const hasConfirmedFood = confirmed.orders.some((order) => order.lines.some((line) => categoryById.get(line.id) === "food"));
+    const conversation = messagesForTable(table);
     const reply = await chatWithWaiter({
-      menu: readMenu(),
+      menu,
+      restaurant: readRestaurantContext(),
       table,
       lang,
       sessionState: {
-        ...(typeof sessionState === "object" && sessionState ? sessionState : {}),
+        ...session,
         confirmedOrders: confirmed.orders,
-        confirmedTotal: confirmed.total
+        confirmedTotal: confirmed.total,
+        hasConfirmedDrink,
+        hasConfirmedFood
       },
-      messages: chatMessages,
+      messages: conversation.length ? conversation : suppliedMessages,
       uiEvent: chatEvent
     });
-    res.json(reply);
+
+    session = applySessionUpdate({
+      table,
+      lang,
+      update: reply.session,
+      forceStage: reply.proposal ? "order_confirmation" : chatEvent === "checkout_requested" ? "checkout" : undefined
+    });
+    if (reply.text) {
+      const entry = appendTranscript({ table, role: "assistant", content: reply.text });
+      mirrorSheetEvent({ type: "conversation", sessionId: session.sessionId, table, lang, stage: session.stage, ...entry });
+    }
+
+    const checkout = chatEvent === "checkout_requested" && confirmed.orders.length
+      ? { orders: confirmed.orders, total: confirmed.total }
+      : null;
+    res.json({
+      text: reply.text,
+      chips: reply.chips,
+      proposal: reply.proposal,
+      highlightRaiseHand: reply.highlightRaiseHand,
+      sessionState: session,
+      checkout
+    });
   } catch (error) {
     if (error instanceof AIConfigurationError) {
       return res.status(503).json({ error: "AI service is not configured." });
@@ -82,9 +145,12 @@ app.post("/api/chat", async (req, res) => {
 
 app.post("/api/orders", (req, res) => {
   try {
-    const { table, items } = req.body || {};
+    const { table, lang = "ja", items } = req.body || {};
     if (!validTable(table)) throw new Error("A valid table number is required.");
-    const order = createConfirmedOrder({ table, items, menu: readMenu() });
+    if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
+    const session = sessionForTable({ table, lang });
+    const order = createConfirmedOrder({ table, lang, sessionId: session.sessionId, items, menu: readMenu() });
+    mirrorSheetEvent({ type: "order", order });
     res.status(201).json({ order });
   } catch (error) {
     console.error("Order confirmation failed:", error);

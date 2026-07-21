@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 .env
 data/*.json
 !data/menu.json
+!data/restaurant.json

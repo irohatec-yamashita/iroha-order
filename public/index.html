@@ -162,6 +162,8 @@
   }
   nav button .ic{font-size:21px; line-height:1;}
   nav button:active{color:var(--blue);}
+  nav button.attention{color:var(--orange); animation:handGlow .8s ease-in-out 3;}
+  @keyframes handGlow{50%{transform:translateY(-3px); filter:drop-shadow(0 0 7px rgba(255,159,10,.65));}}
   nav .badge{
     position:absolute; top:2px; right:calc(50% - 24px); background:var(--red); color:#fff;
     border-radius:9px; font-size:10px; min-width:17px; height:17px; line-height:17px; font-weight:600;
@@ -335,7 +337,7 @@
     <button onclick="openSheet('history')" style="position:relative;">
       <span class="ic">🧾</span><span id="nvHistory">注文履歴</span><span class="badge" id="histBadge" style="display:none;">0</span>
     </button>
-    <button onclick="raiseHand()"><span class="ic">🖐</span><span id="nvHand">手を挙げる</span></button>
+    <button id="raiseBtn" onclick="raiseHand()"><span class="ic">🖐</span><span id="nvHand">手を挙げる</span></button>
     <button onclick="openSheet('lang')"><span class="ic">🌐</span><span>language</span></button>
     <button onclick="checkout()"><span class="ic">💴</span><span id="nvPay">お会計</span></button>
   </nav>

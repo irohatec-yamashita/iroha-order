@@ -12,9 +12,8 @@ const UI = {
     drinks: "お飲み物", food: "お料理", dessert: "デザート", other: "その他",
     recommended: "おすすめ", table: (n) => `テーブル ${n} ｜ AI接客中`,
     tableOnly: (n) => `テーブル ${n}`, menuSelection: "（メニューから選択）",
-    checkQuestion: "ご注文内容です。お間違いないですか？",
-    noOrdersCheck: "お会計をお願いします。", changeBeforeCheck: "お会計の前に注文内容を変更したいです。", staffNotified: (kind) => `店舗スタッフに「テーブル${table} ${kind}」を通知しました`,
-    raiseKind: "呼び出し", checkKind: "お会計", remove: "削除", retry: "通信に失敗しました。少し待ってからもう一度お試しください。",
+    changeBeforeCheck: "お会計の前に注文内容を変更したいです。",
+    remove: "削除", retry: "通信に失敗しました。少し待ってからもう一度お試しください。",
     micUnsupported: "このブラウザは音声入力に対応していません（Chrome推奨）", listening: "🎤 お話しください…"
   },
   en: {
@@ -26,9 +25,8 @@ const UI = {
     drinks: "Drinks", food: "Food", dessert: "Dessert", other: "Other",
     recommended: "Recommended", table: (n) => `Table ${n} | AI Service`,
     tableOnly: (n) => `Table ${n}`, menuSelection: "(selected from menu)",
-    checkQuestion: "Here is your order. Is everything correct?",
-    noOrdersCheck: "I'd like the check, please.", changeBeforeCheck: "I'd like to change the order before checkout.", staffNotified: (kind) => `Staff notified: Table ${table} — ${kind}`,
-    raiseKind: "Call Staff", checkKind: "Check", remove: "Remove", retry: "Connection failed. Please wait a moment and try again.",
+    changeBeforeCheck: "I'd like to change the order before checkout.",
+    remove: "Remove", retry: "Connection failed. Please wait a moment and try again.",
     micUnsupported: "Voice input is not supported in this browser (Chrome recommended)", listening: "🎤 Listening…"
   }
 };
@@ -172,10 +170,6 @@ function toggleTTS() {
   $("ttsBtn").classList.toggle("off", !ttsOn);
 }
 
-function sessionState() {
-  return { pendingProposal: pendingProposal ? { items: pendingProposal.items, note: pendingProposal.note || "" } : null };
-}
-
 async function requestAI({ userText, uiEvent } = {}) {
   if (busy) return;
   removeChips();
@@ -189,9 +183,10 @@ async function requestAI({ userText, uiEvent } = {}) {
     const reply = await api("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ table, lang, sessionState: sessionState(), messages: messages.slice(-28), ...(uiEvent ? { type: uiEvent } : {}) })
+      body: JSON.stringify({ table, lang, ...(userText ? { message: userText } : {}), ...(uiEvent ? { type: uiEvent } : {}) })
     });
     hideTyping();
+    if (reply.highlightRaiseHand) highlightRaiseHand();
     if (reply.text) {
       messages.push({ role: "assistant", content: reply.text });
       await botSay(reply.text, { chips: reply.chips || [], delay: 0 });
@@ -202,6 +197,7 @@ async function requestAI({ userText, uiEvent } = {}) {
       pendingProposal = reply.proposal;
       await renderProposal(reply.proposal);
     }
+    if (reply.checkout) await renderCheckout(reply.checkout);
     messages = messages.slice(-28);
   } catch (error) {
     hideTyping();
@@ -259,7 +255,7 @@ function renderProposalEditor(proposal) {
 
 async function confirmProposal(items) {
   const result = await api("/api/orders", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, items })
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, lang, items })
   });
   pendingProposal = null;
   await refreshOrderBadge();
@@ -356,8 +352,8 @@ async function refreshOrderBadge() {
 async function raiseHand() {
   closeSheets();
   try {
+    $("raiseBtn").classList.remove("attention");
     await api("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, type: "raise_hand" }) });
-    sysSay(`🖐 ${t().staffNotified(t().raiseKind)}`);
     await requestAI({ uiEvent: "raise_hand" });
   } catch (error) { console.error(error); toast(t().retry); }
 }
@@ -365,19 +361,21 @@ async function raiseHand() {
 async function checkout() {
   closeSheets();
   try {
-    const history = await getOrderHistory();
-    if (!history.orders.length) { await sendGuestMessage(t().noOrdersCheck); return; }
-    const lines = history.orders.flatMap((order) => order.lines);
-    const html = `${esc(t().checkQuestion)}<div class="order-list">${lines.map((line) => `<div class="li"><span>${esc(lineName(line))}　×${line.qty}</span><span>${money(line.subtotal)}</span></div>`).join("")}<div class="li total"><span>${esc(t().total)}</span><span>${money(history.total)}</span></div></div>`;
-    await botSay(html, { html: true, speakText: `${t().checkQuestion} ${t().total} ${history.total}`, actions: [
-      { label: t().confirm, cls: "btn-confirm", fn: confirmCheckout },
-      { label: t().edit, cls: "btn-modify", fn: () => sendGuestMessage(t().changeBeforeCheck) }
-    ] });
+    await requestAI({ uiEvent: "checkout_requested" });
   } catch (error) { console.error(error); toast(t().retry); }
 }
+
+async function renderCheckout(checkout) {
+  const lines = checkout.orders.flatMap((order) => order.lines);
+  const html = `<div class="order-list">${lines.map((line) => `<div class="li"><span>${esc(lineName(line))}　×${line.qty}</span><span>${money(line.subtotal)}</span></div>`).join("")}<div class="li total"><span>${esc(t().total)}</span><span>${money(checkout.total)}</span></div></div>`;
+  await botSay(html, { html: true, speak: false, delay: 0, actions: [
+    { label: t().confirm, cls: "btn-confirm", fn: confirmCheckout },
+    { label: t().edit, cls: "btn-modify", fn: () => sendGuestMessage(t().changeBeforeCheck) }
+  ] });
+}
+
 async function confirmCheckout() {
   await api("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, type: "check" }) });
-  sysSay(`💴 ${t().staffNotified(t().checkKind)}`);
   await requestAI({ uiEvent: "check_confirmed" });
 }
 
@@ -388,8 +386,15 @@ async function setLang(nextLang) {
   history.replaceState(null, "", `${location.pathname}?${params}`);
   applyLangUI();
   closeSheets();
-  sysSay(`🌐 language: ${lang === "ja" ? "日本語" : "English"}`);
   await requestAI({ uiEvent: "language_changed" });
+}
+
+function highlightRaiseHand() {
+  const button = $("raiseBtn");
+  button.classList.remove("attention");
+  void button.offsetWidth;
+  button.classList.add("attention");
+  setTimeout(() => button.classList.remove("attention"), 5000);
 }
 function applyLangUI() {
   document.documentElement.lang = lang;
