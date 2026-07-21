@@ -7,7 +7,7 @@ const UI = {
     placeholder: "メッセージを入力…", ttsOn: "🔊 読み上げ ON", ttsOff: "🔇 読み上げ OFF",
     menu: "メニュー", history: "注文履歴", hand: "手を挙げる", check: "お会計",
     pickItems: "品を選んでください", orderN: (n) => `選択した ${n} 点を注文する`,
-    confirm: "確定", edit: "修正する", total: "合計", subtotal: "小計",
+    confirm: "確定", edit: "修正する", total: "合計", subtotal: "小計", confirmGuide: "内容を確認し、下の「確定」ボタンを押してください。",
     emptyHistory: "まだ注文はありません。", taxNote: "※ 価格は税込です",
     drinks: "お飲み物", food: "お料理", dessert: "デザート", other: "その他",
     recommended: "おすすめ", table: (n) => `テーブル ${n} ｜ AI接客中`,
@@ -20,7 +20,7 @@ const UI = {
     placeholder: "Type a message…", ttsOn: "🔊 Voice ON", ttsOff: "🔇 Voice OFF",
     menu: "Menu", history: "Order History", hand: "Call Staff", check: "Check",
     pickItems: "Select items", orderN: (n) => `Order ${n} selected item(s)`,
-    confirm: "Confirm", edit: "Change", total: "Total", subtotal: "Subtotal",
+    confirm: "Confirm", edit: "Change", total: "Total", subtotal: "Subtotal", confirmGuide: "Review the items, then press Confirm below.",
     emptyHistory: "No orders yet.", taxNote: "※ Prices include tax",
     drinks: "Drinks", food: "Food", dessert: "Dessert", other: "Other",
     recommended: "Recommended", table: (n) => `Table ${n} | AI Service`,
@@ -221,13 +221,13 @@ async function requestAI({ userText, uiEvent } = {}) {
 
 function proposalHtml(proposal) {
   const lines = proposal.lines.map((line) => `<div class="li"><span>${esc(lineName(line))}　×${line.qty}</span><span>${money(line.subtotal)}</span></div>`).join("");
-  return `<div class="order-list">${lines}<div class="li total"><span>${esc(t().subtotal)}</span><span>${money(proposal.total)}</span></div></div>`;
+  return `<div class="proposal-guide">${esc(t().confirmGuide)}</div><div class="order-list">${lines}<div class="li total"><span>${esc(t().subtotal)}</span><span>${money(proposal.total)}</span></div></div>`;
 }
 
 async function renderProposal(proposal) {
   await botSay(proposalHtml(proposal), {
     html: true,
-    speakText: proposal.lines.map((line) => `${lineName(line)} ${line.qty}`).join(", "),
+    speakText: `${proposal.lines.map((line) => `${lineName(line)} ${line.qty}`).join(", ")}。${t().confirmGuide}`,
     actions: [
       { label: t().confirm, cls: "btn-confirm", fn: () => confirmProposal(proposal.items) },
       { label: t().edit, cls: "btn-modify", fn: () => renderProposalEditor(proposal) }
@@ -386,6 +386,7 @@ async function renderCheckout(checkout) {
 
 async function confirmCheckout() {
   await api("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table, type: "check" }) });
+  await refreshOrderBadge();
   await requestAI({ uiEvent: "check_confirmed" });
 }
 

@@ -12,7 +12,7 @@ const {
   messagesForTable,
   sessionForTable
 } = require("./lib/session");
-const { appendEvent, createConfirmedOrder, ordersForTable } = require("./lib/store");
+const { appendEvent, closeOrdersForTable, createConfirmedOrder, ordersForTable } = require("./lib/store");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -60,6 +60,27 @@ function safeChatEvent(type, uiEvent) {
   const event = type || uiEvent;
   if (event && !chatEventTypes.has(event)) throw new Error("Unsupported chat event.");
   return event;
+}
+
+function serviceAnswerFor(session, message) {
+  if (!message) return null;
+  const normalized = message.trim().normalize("NFKC").toLowerCase();
+  if (session.stage === "party_size") {
+    const match = normalized.match(/([1-9]\d?)\s*(?:名|人|people|persons?)/);
+    if (match) return { kind: "party_size_answered", partySize: Number(match[1]) };
+  }
+  if (session.stage === "first_visit") {
+    if (/初めて(?:では|じゃ)ない|来たことが|リピーター|returning|not (?:my |our )?first|^no\b/.test(normalized)) {
+      return { kind: "first_visit_answered", firstVisit: false };
+    }
+    if (/初めて|初来店|first time|^yes\b/.test(normalized)) {
+      return { kind: "first_visit_answered", firstVisit: true };
+    }
+  }
+  if (session.stage === "dislikes" && /^(特になし|なし|ありません|ないです|特にありません|none|nothing|no)$/i.test(normalized)) {
+    return { kind: "dislikes_none", dislikes: [] };
+  }
+  return null;
 }
 
 app.use(express.json({ limit: "100kb" }));
@@ -132,11 +153,13 @@ app.post("/api/chat", async (req, res) => {
     const chatEvent = safeChatEvent(type, uiEvent);
     const suppliedMessages = messages === undefined ? [] : safeMessages(messages);
     let session = chatEvent === "guest_seated" ? beginSession({ table, lang }) : sessionForTable({ table, lang });
+    const mustAdvanceToDislikes = chatEvent === "order_confirmed" && !session.dislikesAsked;
     let guestMessage = safeMessage(message);
     if (!guestMessage && !chatEvent && suppliedMessages.at(-1)?.role === "user") {
       guestMessage = suppliedMessages.at(-1).content;
     }
     if (!chatEvent && !guestMessage) throw new Error("A guest message or chat event is required.");
+    const turnSignal = serviceAnswerFor(session, guestMessage);
 
     if (guestMessage) {
       const entry = appendTranscript({ table, role: "user", content: guestMessage });
@@ -156,6 +179,7 @@ app.post("/api/chat", async (req, res) => {
       lang,
       sessionState: {
         ...session,
+        turnSignal,
         confirmedOrders: confirmed.orders,
         confirmedTotal: confirmed.total,
         hasConfirmedDrink,
@@ -165,11 +189,34 @@ app.post("/api/chat", async (req, res) => {
       uiEvent: chatEvent
     });
 
+    let sessionUpdate = mustAdvanceToDislikes
+      ? { ...(reply.session || {}), stage: "dislikes", dislikesAsked: true }
+      : reply.session;
+    if (turnSignal?.kind === "party_size_answered") {
+      sessionUpdate = { ...(sessionUpdate || {}), stage: "first_visit", partySize: turnSignal.partySize };
+    }
+    if (turnSignal?.kind === "first_visit_answered") {
+      sessionUpdate = { ...(sessionUpdate || {}), stage: "drinks", firstVisit: turnSignal.firstVisit };
+    }
+    if (turnSignal?.kind === "dislikes_none") {
+      sessionUpdate = { ...(sessionUpdate || {}), stage: "food", dislikes: [], dislikesAsked: true };
+    }
+    const forcedStage = reply.proposal
+      ? "order_confirmation"
+      : chatEvent === "checkout_requested"
+        ? "checkout"
+        : turnSignal?.kind === "party_size_answered"
+          ? "first_visit"
+          : turnSignal?.kind === "first_visit_answered"
+            ? "drinks"
+            : turnSignal?.kind === "dislikes_none"
+              ? "food"
+              : undefined;
     session = applySessionUpdate({
       table,
       lang,
-      update: reply.session,
-      forceStage: reply.proposal ? "order_confirmation" : chatEvent === "checkout_requested" ? "checkout" : undefined
+      update: sessionUpdate,
+      forceStage: forcedStage
     });
     if (reply.text) {
       const entry = appendTranscript({ table, role: "assistant", content: reply.text });
@@ -220,7 +267,10 @@ app.post("/api/events", (req, res) => {
   try {
     const { table, type } = req.body || {};
     if (!validTable(table)) throw new Error("A valid table number is required.");
-    res.status(201).json({ event: appendEvent({ table, type }) });
+    const event = appendEvent({ table, type });
+    const closedOrderIds = type === "check" ? closeOrdersForTable(table) : [];
+    if (closedOrderIds.length) mirrorSheetEvent({ type: "checkout_requested", table, orderIds: closedOrderIds, time: event.time });
+    res.status(201).json({ event, closedOrderIds });
   } catch (error) {
     console.error("Event creation failed:", error);
     res.status(400).json({ error: "Unable to create this event." });
@@ -237,4 +287,4 @@ function startServer(listenPort = port) {
 
 if (require.main === module) startServer();
 
-module.exports = { app, startServer };
+module.exports = { app, serviceAnswerFor, startServer };
