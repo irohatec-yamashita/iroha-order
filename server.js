@@ -4,7 +4,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { AIConfigurationError, chatWithWaiter } = require("./lib/ai");
-const { createConfirmedOrder, ordersForTable } = require("./lib/store");
+const { appendEvent, createConfirmedOrder, ordersForTable } = require("./lib/store");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -44,15 +44,24 @@ app.get("/api/menu", (_req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const { table, lang = "ja", sessionState = {}, messages } = req.body || {};
+    const { table, lang = "ja", sessionState = {}, messages, uiEvent } = req.body || {};
     if (!validTable(table)) throw new Error("A valid table number is required.");
     if (!["ja", "en"].includes(lang)) throw new Error("Unsupported language.");
+    if (uiEvent && !["guest_seated", "order_confirmed", "raise_hand", "check_confirmed", "language_changed"].includes(uiEvent)) {
+      throw new Error("Unsupported UI event.");
+    }
+    const confirmed = ordersForTable(table);
     const reply = await chatWithWaiter({
       menu: readMenu(),
       table,
       lang,
-      sessionState: typeof sessionState === "object" && sessionState ? sessionState : {},
-      messages: safeMessages(messages)
+      sessionState: {
+        ...(typeof sessionState === "object" && sessionState ? sessionState : {}),
+        confirmedOrders: confirmed.orders,
+        confirmedTotal: confirmed.total
+      },
+      messages: safeMessages(messages),
+      uiEvent
     });
     res.json(reply);
   } catch (error) {
@@ -79,6 +88,17 @@ app.post("/api/orders", (req, res) => {
 app.get("/api/orders", (req, res) => {
   if (!validTable(req.query.table)) return res.status(400).json({ error: "A valid table number is required." });
   res.json(ordersForTable(req.query.table));
+});
+
+app.post("/api/events", (req, res) => {
+  try {
+    const { table, type } = req.body || {};
+    if (!validTable(table)) throw new Error("A valid table number is required.");
+    res.status(201).json({ event: appendEvent({ table, type }) });
+  } catch (error) {
+    console.error("Event creation failed:", error);
+    res.status(400).json({ error: "Unable to create this event." });
+  }
 });
 
 app.use(express.static(path.join(__dirname, "public")));

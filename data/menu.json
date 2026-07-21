@@ -2,15 +2,15 @@
   "restaurant": "居酒屋 いろは",
   "taxNote": "prices include 10% tax",
   "items": [
-    {"id":"beer","name":"生ビール","en":"Draft Beer","cat":"drink","price":600,"aliases":["ナマ","生","生ビ","ビール"],"desc":"キンキンに冷えた生ビール","ingredients":[],"soldOut":false},
-    {"id":"lemonsour","name":"レモンサワー","en":"Lemon Sour","cat":"drink","price":500,"aliases":["レモン"],"desc":"自家製レモンの酸味","ingredients":["lemon"],"soldOut":false},
-    {"id":"highball","name":"ハイボール","en":"Highball","cat":"drink","price":550,"aliases":["ハイボ"],"desc":"すっきり辛口","ingredients":[],"soldOut":false},
-    {"id":"oolong","name":"ウーロン茶","en":"Oolong Tea","cat":"drink","price":300,"aliases":["ウーロン","お茶"],"desc":"","ingredients":[],"soldOut":false},
-    {"id":"sashimi","name":"刺身盛り合わせ","en":"Sashimi Platter","cat":"food","price":800,"aliases":["盛り合わせ","刺身","盛合せ"],"desc":"瀬戸内の地魚（鯛・イカ・アジ）","ingredients":["fish"],"soldOut":false,"perPerson":true,"recommended":true},
-    {"id":"karaage","name":"唐揚げ","en":"Fried Chicken","cat":"food","price":600,"aliases":["からあげ","鶏唐"],"desc":"外はカリッと中はジューシー","ingredients":["chicken"],"soldOut":false,"recommended":true},
-    {"id":"potatosalad","name":"ポテトサラダ","en":"Potato Salad","cat":"food","price":400,"aliases":["ポテサラ"],"desc":"","ingredients":["potato","egg","cucumber"],"soldOut":true},
-    {"id":"edamame","name":"枝豆","en":"Edamame","cat":"food","price":350,"aliases":[],"desc":"","ingredients":["soybean"],"soldOut":false},
-    {"id":"yakitori","name":"焼き鳥盛り","en":"Yakitori Platter","cat":"food","price":700,"aliases":["焼き鳥","やきとり"],"desc":"タレ・塩から選べる5本盛り","ingredients":["chicken"],"soldOut":false},
-    {"id":"dashimaki","name":"だし巻き卵","en":"Dashimaki Omelet","cat":"food","price":450,"aliases":["だし巻き","卵焼き"],"desc":"出汁たっぷりふわふわ","ingredients":["egg"],"soldOut":false}
+    {"id":"beer","name":"生ビール","en":"Draft Beer","cat":"drink","price":600,"aliases":["ナマ","生","生ビ","ビール"],"desc":"キンキンに冷えた、のどごしの良い生ビール。最初の一杯におすすめです。","origin":"国内醸造の生ビール","pairing":"唐揚げや焼き鳥の香ばしさとよく合います。","portion":"中ジョッキ","ingredients":[],"soldOut":false},
+    {"id":"lemonsour","name":"レモンサワー","en":"Lemon Sour","cat":"drink","price":500,"aliases":["レモン"],"desc":"自家製レモンの酸味がすっきり広がる、食事に合わせやすい一杯です。","origin":"自家製レモンシロップ使用","pairing":"刺身や枝豆など、軽めの料理と相性が良いです。","portion":"グラス","ingredients":["lemon"],"soldOut":false},
+    {"id":"highball","name":"ハイボール","en":"Highball","cat":"drink","price":550,"aliases":["ハイボ"],"desc":"すっきり辛口で、食事の味を邪魔しないハイボールです。","origin":"ウイスキーと炭酸水","pairing":"焼き鳥やだし巻き卵と合わせやすいです。","portion":"グラス","ingredients":[],"soldOut":false},
+    {"id":"oolong","name":"ウーロン茶","en":"Oolong Tea","cat":"drink","price":300,"aliases":["ウーロン","お茶"],"desc":"香りが穏やかな定番のソフトドリンクです。","origin":"茶葉抽出","pairing":"どのお料理にも合わせやすいです。","portion":"グラス","ingredients":[],"soldOut":false},
+    {"id":"sashimi","name":"刺身盛り合わせ","en":"Sashimi Platter","cat":"food","price":800,"aliases":["盛り合わせ","刺身","盛合せ"],"desc":"瀬戸内の地魚を中心に、その日の入荷から盛り合わせます。鯛・イカ・アジなどが目安ですが、内容は仕入れにより変わります。","origin":"瀬戸内の地魚を中心に当日入荷で構成","pairing":"日本酒のすっきりしたタイプや、レモンサワーと好相性です。","portion":"1人前の目安","ingredients":["fish"],"soldOut":false,"perPerson":true,"recommended":true},
+    {"id":"karaage","name":"唐揚げ","en":"Fried Chicken","cat":"food","price":600,"aliases":["からあげ","鶏唐"],"desc":"外はカリッと、中はジューシーに揚げた鶏の唐揚げです。","origin":"鶏肉使用","pairing":"生ビールやハイボールにおすすめです。","portion":"シェア向けの一皿","ingredients":["chicken"],"soldOut":false,"recommended":true},
+    {"id":"potatosalad","name":"ポテトサラダ","en":"Potato Salad","cat":"food","price":400,"aliases":["ポテサラ"],"desc":"じゃがいも、卵、きゅうりを使った定番のポテトサラダです。","origin":"店内仕込み","pairing":"生ビールやハイボールによく合います。","portion":"小鉢","ingredients":["potato","egg","cucumber"],"soldOut":true},
+    {"id":"edamame","name":"枝豆","en":"Edamame","cat":"food","price":350,"aliases":[],"desc":"塩味でさっと楽しめる、最初の一品に向いた枝豆です。","origin":"国産枝豆を中心に使用","pairing":"生ビールやレモンサワーと好相性です。","portion":"小鉢","ingredients":["soybean"],"soldOut":false},
+    {"id":"yakitori","name":"焼き鳥盛り","en":"Yakitori Platter","cat":"food","price":700,"aliases":["焼き鳥","やきとり"],"desc":"タレ・塩から選べる5本盛り。香ばしく焼き上げます。","origin":"鶏肉使用","pairing":"ハイボールや生ビール、すっきりした日本酒にも合います。","portion":"5本・シェア向け","ingredients":["chicken"],"soldOut":false},
+    {"id":"dashimaki","name":"だし巻き卵","en":"Dashimaki Omelet","cat":"food","price":450,"aliases":["だし巻き","卵焼き"],"desc":"出汁たっぷりで、ふわふわに仕上げただし巻き卵です。","origin":"店内調理","pairing":"ハイボールや日本酒のやさしい味わいに合わせやすいです。","portion":"シェア向けの一皿","ingredients":["egg"],"soldOut":false}
   ]
 }
