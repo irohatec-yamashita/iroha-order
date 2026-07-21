@@ -154,6 +154,7 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   const confirmed = await chat(server, { table: "5", lang: "ja", type: "order_confirmed" });
   assert.match(confirmed.text, /苦手な食材/);
   assert.ok(confirmed.chips.includes("特になし"));
+  assert.equal(confirmed.proposal, null, "order_confirmed must never repeat the order proposal");
   assert.equal(confirmed.sessionState.stage, "dislikes");
   assert.equal(confirmed.sessionState.dislikesAsked, true);
 
@@ -183,6 +184,9 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   assert.equal(speechRequests.length, 1);
 
   assert.equal(modelRequests.length, 6);
+  assert.equal(modelRequests[0].tool_choice, "none");
+  assert.equal(modelRequests[3].tool_choice, "auto");
+  assert.equal(modelRequests[4].tool_choice, "none", "order_confirmed must disable propose_order");
   assert.match(JSON.stringify(modelRequests[1].input), /2名です/);
   assert.match(JSON.stringify(modelRequests[2].input), /初めてです/);
   assert.match(modelRequests[2].instructions, /"kind":"first_visit_answered"/);

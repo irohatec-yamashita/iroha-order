@@ -203,7 +203,8 @@ async function requestAI({ userText, uiEvent } = {}) {
     } else if (reply.chips?.length) {
       addChips(reply.chips);
     }
-    if (reply.proposal) {
+    // Session events (including order_confirmed) must never render a new order card.
+    if (reply.proposal && !uiEvent) {
       pendingProposal = reply.proposal;
       await renderProposal(reply.proposal);
     }

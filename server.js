@@ -211,6 +211,9 @@ app.post("/api/chat", async (req, res) => {
       messages: conversation.length ? conversation : suppliedMessages,
       uiEvent: chatEvent
     });
+    // A UI event is an acknowledgement/transition, never a new order request.
+    // Keep this server-side boundary even if a model unexpectedly emits a tool call.
+    const proposal = chatEvent ? null : reply.proposal;
 
     let sessionUpdate = mustAdvanceToDislikes
       ? { ...(reply.session || {}), stage: "dislikes", dislikesAsked: true }
@@ -224,7 +227,7 @@ app.post("/api/chat", async (req, res) => {
     if (turnSignal?.kind === "dislikes_none") {
       sessionUpdate = { ...(sessionUpdate || {}), stage: "food", dislikes: [], dislikesAsked: true };
     }
-    const forcedStage = reply.proposal
+    const forcedStage = proposal
       ? "order_confirmation"
       : chatEvent === "checkout_requested"
         ? "checkout"
@@ -252,7 +255,7 @@ app.post("/api/chat", async (req, res) => {
     res.json({
       text: reply.text,
       chips: reply.chips,
-      proposal: reply.proposal,
+      proposal,
       highlightRaiseHand: reply.highlightRaiseHand,
       sessionState: session,
       checkout
