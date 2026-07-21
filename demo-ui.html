@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI接客オーダーシステム デモ — 居酒屋 瀬戸内（テーブル5）</title>
+<style>
+  :root{
+    --blue:#007aff; --green:#34c759; --orange:#ff9f0a; --red:#ff3b30;
+    --bg:#f2f2f7; --card:#ffffff; --label:#1c1c1e; --label2:#8e8e93; --label3:#aeaeb2;
+    --sep:rgba(60,60,67,.15); --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.20);
+    --ai-bubble:#e9e9eb; --user-bubble:linear-gradient(180deg,#0a84ff,#007aff);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro JP","Helvetica Neue",
+      "Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+    background:#e2e2e7; display:flex; justify-content:center; align-items:center; height:100vh; overflow:hidden;
+    color:var(--label);
+    -webkit-font-smoothing:antialiased;
+  }
+  /* スマホ枠（PC表示時） */
+  #phone{
+    width:100%; max-width:420px; height:100vh; max-height:100vh;
+    background:var(--bg); display:flex; flex-direction:column; position:relative; overflow:hidden;
+  }
+  @media (min-width:520px){
+    body{padding:18px 0;}
+    #phone{height:calc(100vh - 36px); border-radius:44px; box-shadow:0 24px 80px rgba(0,0,0,.4); border:8px solid #1c1c1e;}
+  }
+
+  /* ===== デモ設定バー ===== */
+  #demoBar{
+    background:var(--bg); color:var(--label2); font-size:11px; padding:6px 12px;
+    display:flex; align-items:center; gap:10px; flex-shrink:0; border-bottom:.5px solid var(--sep);
+  }
+  #demoBar .seg{
+    display:flex; background:var(--fill); border-radius:9px; padding:2px; gap:2px;
+  }
+  #demoBar .seg button{
+    background:none; border:none; color:var(--label); font-size:11px; padding:4px 12px;
+    cursor:pointer; border-radius:7px; font-family:inherit;
+  }
+  #demoBar .seg button.on{
+    background:#fff; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12);
+  }
+
+  /* ===== ヘッダー（すりガラス） ===== */
+  header{
+    background:rgba(249,249,249,.85); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+    color:var(--label); padding:10px 14px; display:flex; align-items:center; gap:11px; flex-shrink:0;
+    border-bottom:.5px solid var(--sep); z-index:5;
+  }
+  .logo{
+    width:40px;height:40px;border-radius:12px;
+    background:linear-gradient(160deg,#3d4f7c,#1e2a4a);
+    display:flex;align-items:center;justify-content:center;
+    font-size:21px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.15);
+  }
+  .shop-info{flex:1; min-width:0;}
+  .shop-info .name{font-weight:600; font-size:16px; letter-spacing:-.2px;}
+  .shop-info .table{font-size:12px; color:var(--label2);}
+  #ttsBtn{
+    background:rgba(0,122,255,.12); border:none; color:var(--blue);
+    border-radius:16px; padding:6px 13px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
+    font-family:inherit;
+  }
+  #ttsBtn.off{background:var(--fill); color:var(--label2);}
+
+  /* ===== チャットエリア ===== */
+  #chat{
+    flex:1; overflow-y:auto; padding:16px 14px 10px; scroll-behavior:smooth;
+    background:var(--bg);
+  }
+  .row{display:flex; margin-bottom:10px; align-items:flex-end; gap:8px;}
+  .row.user{flex-direction:row-reverse;}
+  .avatar{
+    width:30px;height:30px;border-radius:50%;
+    background:linear-gradient(160deg,#3d4f7c,#1e2a4a);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;
+  }
+  .bubble{
+    max-width:76%; padding:9px 14px; border-radius:20px; font-size:15px; line-height:1.55;
+    white-space:pre-wrap; word-break:break-word; letter-spacing:-.1px;
+  }
+  .row.ai .bubble{background:var(--ai-bubble); color:var(--label); border-bottom-left-radius:6px;}
+  .row.user .bubble{background:var(--user-bubble); color:#fff; border-bottom-right-radius:6px;}
+  .row.sys{justify-content:center; margin:12px 0;}
+  .row.sys .bubble{
+    background:none; color:var(--label2); font-size:12px; text-align:center;
+    border-radius:0; max-width:90%; padding:0 10px; font-weight:500;
+  }
+  .bubble .order-list{
+    margin:8px 0 6px; padding:10px 12px; background:rgba(255,255,255,.75); border-radius:12px; font-size:13.5px;
+  }
+  .bubble .order-list .li{display:flex; justify-content:space-between; gap:12px; padding:1px 0;}
+  .bubble .order-list .total{border-top:.5px solid var(--sep); margin-top:6px; padding-top:6px; font-weight:600;}
+
+  /* インラインボタン（確定／修正） */
+  .inline-actions{display:flex; gap:9px; margin:4px 0 16px 38px; flex-wrap:wrap;}
+  .inline-actions button{
+    border:none; border-radius:20px; padding:10px 24px; font-size:15px; font-weight:600; cursor:pointer;
+    font-family:inherit; letter-spacing:-.2px;
+    transition:transform .1s, opacity .15s;
+  }
+  .inline-actions button:active{transform:scale(.96);}
+  .btn-confirm{background:var(--blue); color:#fff;}
+  .btn-modify{background:var(--fill); color:var(--blue);}
+  .btn-hand{background:var(--orange); color:#fff;}
+  .inline-actions button:disabled{opacity:.35; cursor:default; transform:none;}
+
+  /* クイック返信チップ */
+  .chips{display:flex; gap:8px; margin:2px 0 16px 38px; flex-wrap:wrap;}
+  .chips button{
+    background:#fff; border:1px solid rgba(0,122,255,.4); color:var(--blue);
+    border-radius:17px; padding:7px 15px; font-size:14px; cursor:pointer; font-family:inherit;
+    font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.04);
+    transition:transform .1s;
+  }
+  .chips button:active{background:var(--blue); color:#fff; transform:scale(.96);}
+
+  /* 入力中インジケータ */
+  .typing{display:inline-flex; gap:4px; padding:5px 2px;}
+  .typing span{width:8px;height:8px;border-radius:50%;background:#b0b0b6;animation:blink 1.2s infinite;}
+  .typing span:nth-child(2){animation-delay:.2s;} .typing span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,60%,100%{opacity:.3;}30%{opacity:1;}}
+
+  /* ===== 入力バー（すりガラス） ===== */
+  #inputBar{
+    display:flex; gap:8px; padding:8px 12px; align-items:center;
+    background:rgba(249,249,249,.85); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+    border-top:.5px solid var(--sep); flex-shrink:0; z-index:5;
+  }
+  #inputBar input{
+    flex:1; border:none; background:var(--fill); border-radius:19px; padding:10px 16px;
+    font-size:15px; outline:none; font-family:inherit; color:var(--label);
+  }
+  #inputBar input::placeholder{color:var(--label3);}
+  #micBtn,#sendBtn{
+    width:38px;height:38px;border-radius:50%;border:none;font-size:16px;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .1s;
+  }
+  #micBtn:active,#sendBtn:active{transform:scale(.92);}
+  #micBtn{background:var(--fill); color:var(--label2);}
+  #micBtn.rec{background:var(--red); color:#fff; animation:pulse 1s infinite;}
+  @keyframes pulse{50%{transform:scale(1.1);}}
+  #sendBtn{background:var(--blue); color:#fff;}
+
+  /* ===== 常時ボタン（iOSタブバー風） ===== */
+  nav{
+    display:flex; flex-shrink:0; padding-bottom:env(safe-area-inset-bottom);
+    background:rgba(249,249,249,.9); backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+    border-top:.5px solid var(--sep); z-index:5;
+  }
+  nav button{
+    flex:1; background:none; border:none; color:var(--label2); padding:8px 2px 9px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10px; position:relative;
+    font-family:inherit; font-weight:500;
+    transition:color .15s;
+  }
+  nav button .ic{font-size:21px; line-height:1;}
+  nav button:active{color:var(--blue);}
+  nav .badge{
+    position:absolute; top:2px; right:calc(50% - 24px); background:var(--red); color:#fff;
+    border-radius:9px; font-size:10px; min-width:17px; height:17px; line-height:17px; font-weight:600;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+
+  /* ===== モーダル（iOSシート風） ===== */
+  .sheet-wrap{
+    position:absolute; inset:0; background:rgba(0,0,0,.35); display:none; z-index:30;
+    align-items:flex-end;
+  }
+  .sheet-wrap.open{display:flex;}
+  .sheet{
+    background:var(--bg); width:100%; max-height:84%; border-radius:16px 16px 0 0;
+    display:flex; flex-direction:column; animation:up .28s cubic-bezier(.2,.9,.3,1);
+    position:relative;
+  }
+  .sheet::before{
+    content:""; position:absolute; top:7px; left:50%; transform:translateX(-50%);
+    width:36px; height:5px; border-radius:3px; background:var(--fill2);
+  }
+  @keyframes up{from{transform:translateY(35%);opacity:.6;}to{transform:none;opacity:1;}}
+  .sheet-head{
+    display:flex; align-items:center; justify-content:space-between; padding:22px 18px 12px;
+    flex-shrink:0;
+  }
+  .sheet-head h2{font-size:19px; color:var(--label); font-weight:700; letter-spacing:-.3px;}
+  .sheet-head .close{
+    background:var(--fill); border:none; width:28px; height:28px; border-radius:50%;
+    font-size:13px; color:var(--label2); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .sheet-body{overflow-y:auto; padding:4px 16px 24px;}
+
+  /* メニューシート */
+  .cat-title{
+    font-size:13px; font-weight:600; color:var(--label2); margin:18px 4px 8px;
+    text-transform:uppercase; letter-spacing:.3px;
+  }
+  .cat-title:first-child{margin-top:4px;}
+  .m-item{
+    display:flex; align-items:center; gap:12px; background:var(--card); border-radius:14px;
+    padding:11px 13px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .m-item .ph{
+    width:54px;height:54px;border-radius:12px;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;
+    font-size:29px; flex-shrink:0;
+  }
+  .m-item .info{flex:1; min-width:0;}
+  .m-item .info .nm{font-size:15px; font-weight:600; letter-spacing:-.2px;}
+  .m-item .info .ds{font-size:12px; color:var(--label2); margin-top:1px;}
+  .m-item .info .pr{font-size:13.5px; color:var(--label); margin-top:2px; font-weight:600;}
+  .stepper{
+    display:flex; align-items:center; gap:0; flex-shrink:0;
+    background:var(--fill); border-radius:9px; padding:2px;
+  }
+  .stepper button{
+    width:32px;height:30px;border:none;background:none;color:var(--blue);
+    font-size:17px;cursor:pointer;line-height:1;font-family:inherit;font-weight:500;
+  }
+  .stepper .cnt{min-width:22px; text-align:center; font-weight:600; font-size:15px;}
+  #menuOrderBar{
+    flex-shrink:0; padding:10px 16px calc(14px + env(safe-area-inset-bottom));
+    background:rgba(249,249,249,.9); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    border-top:.5px solid var(--sep);
+  }
+  #menuOrderBar button{
+    width:100%; background:var(--blue); color:#fff; border:none; border-radius:14px;
+    padding:14px; font-size:16px; font-weight:600; cursor:pointer; font-family:inherit;
+    letter-spacing:-.2px; transition:transform .1s;
+  }
+  #menuOrderBar button:active{transform:scale(.98);}
+  #menuOrderBar button:disabled{background:var(--fill2); color:var(--label3); transform:none;}
+
+  /* 注文履歴 */
+  .hist-card{background:var(--card); border-radius:14px; padding:4px 16px; box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .h-line{display:flex; justify-content:space-between; padding:11px 0; font-size:14.5px; border-bottom:.5px solid var(--sep);}
+  .h-line:last-of-type{border-bottom:none;}
+  .h-line .q{color:var(--label2); margin-left:8px; font-size:13px;}
+  .h-total{
+    display:flex; justify-content:space-between; padding:14px 16px; font-size:17px; font-weight:700;
+    background:var(--card); border-radius:14px; margin-top:10px; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .h-note{font-size:12px; color:var(--label2); margin:10px 4px 0; line-height:1.5;}
+
+  /* 言語シート */
+  .lang-btn{
+    display:flex; align-items:center; gap:13px; width:100%; background:var(--card); border:none;
+    border-radius:14px; padding:14px 17px; margin-bottom:9px; font-size:16px; cursor:pointer; text-align:left;
+    font-family:inherit; color:var(--label); font-weight:500; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .lang-btn .flag{font-size:23px;}
+  .lang-btn.active::after{content:"✓"; margin-left:auto; color:var(--blue); font-weight:700; font-size:17px;}
+  .lang-btn.soon{opacity:.4; cursor:default;}
+  .lang-btn.soon .soon-tag{margin-left:auto; font-size:12px; color:var(--label2); font-weight:400;}
+
+  /* ===== 起動スプラッシュ（言語選択） ===== */
+  #splash{
+    position:absolute; inset:0; background:#fff; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; color:var(--label); padding:32px; text-align:center;
+  }
+  #splash .big-logo{
+    width:88px; height:88px; border-radius:22px;
+    background:linear-gradient(160deg,#3d4f7c,#1e2a4a);
+    display:flex; align-items:center; justify-content:center;
+    font-size:46px; margin-bottom:20px; box-shadow:0 8px 28px rgba(30,42,74,.3);
+  }
+  #splash h1{font-size:24px; margin-bottom:6px; font-weight:700; letter-spacing:-.4px;}
+  #splash .tbl{
+    background:var(--fill); border-radius:15px; padding:5px 16px; font-size:13px; margin:6px 0;
+    color:var(--label2); font-weight:500;
+  }
+  #splash .note{font-size:13px; color:var(--label2); margin-bottom:30px;}
+  #splash .lang-select{width:100%; max-width:280px;}
+  #splash .lang-select button{
+    width:100%; background:var(--blue); color:#fff; border:none; border-radius:14px;
+    padding:15px; font-size:16px; font-weight:600; margin-bottom:10px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:10px; font-family:inherit;
+    letter-spacing:-.2px; transition:transform .1s;
+  }
+  #splash .lang-select button:active{transform:scale(.97);}
+  #splash .lang-select button:nth-child(2){background:var(--fill); color:var(--label);}
+  #splash .lang-select button.soon{background:none; color:var(--label3); font-weight:400; padding:9px;}
+  #splash .qr-hint{font-size:11px; color:var(--label3); margin-top:18px;}
+
+  /* トースト */
+  #toast{
+    position:absolute; bottom:130px; left:50%; transform:translateX(-50%);
+    background:rgba(28,28,30,.92); backdrop-filter:blur(10px); color:#fff;
+    padding:10px 22px; border-radius:20px; font-size:13.5px; font-weight:500;
+    opacity:0; transition:opacity .3s; z-index:60; pointer-events:none;
+    max-width:86%; text-align:center; line-height:1.5;
+  }
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div id="phone">
+
+  <!-- デモ設定（本番では非表示） -->
+  <div id="demoBar">
+    <span>デモ設定</span>
+    <div class="seg">
+      <button id="segWalkin" class="on" onclick="restartDemo('walkin')">飛び込み客</button>
+      <button id="segReserve" onclick="restartDemo('reserve')">予約客（山下様）</button>
+    </div>
+  </div>
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="logo">🍶</div>
+    <div class="shop-info">
+      <div class="name" id="hdShop">居酒屋 瀬戸内</div>
+      <div class="table" id="hdTable">テーブル 5 ｜ AI接客中</div>
+    </div>
+    <button id="ttsBtn" onclick="toggleTTS()">🔊 読み上げ ON</button>
+  </header>
+
+  <!-- チャット -->
+  <div id="chat"></div>
+
+  <!-- 入力バー -->
+  <div id="inputBar">
+    <button id="micBtn" onclick="toggleMic()" title="音声入力（押して話す）">🎤</button>
+    <input id="msgInput" type="text" placeholder="メッセージを入力…" autocomplete="off">
+    <button id="sendBtn" onclick="sendFromInput()">↑</button>
+  </div>
+
+  <!-- 常時ボタン -->
+  <nav>
+    <button onclick="openSheet('menu')"><span class="ic">📖</span><span id="nvMenu">メニュー</span></button>
+    <button onclick="openSheet('history')" style="position:relative;">
+      <span class="ic">🧾</span><span id="nvHistory">注文履歴</span><span class="badge" id="histBadge" style="display:none;">0</span>
+    </button>
+    <button onclick="raiseHand()"><span class="ic">🖐</span><span id="nvHand">手を挙げる</span></button>
+    <button onclick="openSheet('lang')"><span class="ic">🌐</span><span>language</span></button>
+    <button onclick="checkout()"><span class="ic">💴</span><span id="nvPay">お会計</span></button>
+  </nav>
+
+  <!-- メニューシート -->
+  <div class="sheet-wrap" id="sheet-menu">
+    <div class="sheet">
+      <div class="sheet-head"><h2 id="menuTitle">メニュー</h2><button class="close" onclick="closeSheets()">✕</button></div>
+      <div class="sheet-body" id="menuBody"></div>
+      <div id="menuOrderBar"><button id="menuOrderBtn" disabled onclick="orderFromMenu()">品を選んでください</button></div>
+    </div>
+  </div>
+
+  <!-- 注文履歴シート -->
+  <div class="sheet-wrap" id="sheet-history">
+    <div class="sheet">
+      <div class="sheet-head"><h2 id="histTitle">注文履歴</h2><button class="close" onclick="closeSheets()">✕</button></div>
+      <div class="sheet-body" id="histBody"></div>
+    </div>
+  </div>
+
+  <!-- 言語シート -->
+  <div class="sheet-wrap" id="sheet-lang">
+    <div class="sheet">
+      <div class="sheet-head"><h2>language ／ 言語</h2><button class="close" onclick="closeSheets()">✕</button></div>
+      <div class="sheet-body">
+        <button class="lang-btn" id="lb-ja" onclick="setLang('ja')"><span class="flag">🇯🇵</span>日本語</button>
+        <button class="lang-btn" id="lb-en" onclick="setLang('en')"><span class="flag">🇺🇸</span>English</button>
+        <button class="lang-btn soon"><span class="flag">🇨🇳</span>中文<span class="soon-tag">デモ版未対応</span></button>
+        <button class="lang-btn soon"><span class="flag">🇰🇷</span>한국어<span class="soon-tag">デモ版未対応</span></button>
+        <div class="h-note">※ 選択した言語はオーダー情報に記録され、言語別の注文傾向分析に活用されます（仕様書 第7章）。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 起動画面（QR読み取り後の言語選択） -->
+  <div id="splash">
+    <div class="big-logo">🍶</div>
+    <h1>居酒屋 瀬戸内</h1>
+    <div class="tbl">テーブル 5</div>
+    <div class="note">QRコードの読み取りが完了しました</div>
+    <div class="lang-select">
+      <button onclick="startSession('ja')">日本語ではじめる</button>
+      <button onclick="startSession('en')">Start in English</button>
+      <button class="soon">中文（準備中） ／ 한국어（준비중）</button>
+    </div>
+    <div class="qr-hint">AI接客オーダーシステム デモ版 ｜ いろはTEC</div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+/* =========================================================
+   AI接客オーダーシステム デモ版
+   - 仕様書 v1.1（2026-06-25 いろはTEC）第4・5・6章に準拠
+   - AI応答はサンプルシナリオ（スクリプト制御）
+   - 実装版では AIエージェント＋店舗AIコンテキスト＋MCP 連携に置換
+   ========================================================= */
+
+/* ---------- メニューデータ（仮値：仕様書 Q-03 実店舗ヒアリングで確定） ---------- */
+const MENU = [
+  {cat:"drink", id:"beer",    ph:"🍺", price:580,  ja:"生ビール",           en:"Draft Beer",          alias:["生ビール","生","ビール","なま","beer","draft"], ds:"キンキンの中ジョッキ", dsEn:"Ice-cold draft, medium mug"},
+  {cat:"drink", id:"lemon",   ph:"🍋", price:480,  ja:"レモンサワー",       en:"Lemon Sour",          alias:["レモンサワー","レモン","サワー","lemon sour","lemon"], ds:"広島県産レモン使用", dsEn:"Made with Hiroshima lemons"},
+  {cat:"drink", id:"highball",ph:"🥃", price:500,  ja:"ハイボール",         en:"Highball",            alias:["ハイボール","はいぼーる","highball"], ds:"角瓶の定番ハイボール", dsEn:"Classic whisky highball"},
+  {cat:"drink", id:"sake",    ph:"🍶", price:650,  ja:"日本酒（賀茂鶴）",   en:"Sake (Kamotsuru)",    alias:["日本酒","賀茂鶴","かもつる","sake"], ds:"広島の地酒・一合", dsEn:"Local Hiroshima sake, 180ml"},
+  {cat:"drink", id:"oolong",  ph:"🍵", price:300,  ja:"ウーロン茶",         en:"Oolong Tea",          alias:["ウーロン茶","ウーロン","うーろん","oolong","tea"], ds:"ソフトドリンク", dsEn:"Soft drink"},
+  {cat:"food",  id:"sashimi", ph:"🐟", price:1480, ja:"刺身盛り合わせ",     en:"Assorted Sashimi",    alias:["刺身盛り合わせ","刺身","さしみ","盛り合わせ","刺し盛り","sashimi"], ds:"瀬戸内の地魚・1人前", dsEn:"Fresh local fish from the Seto Inland Sea (per person)", unit:"人前", reco:true},
+  {cat:"food",  id:"kaki",    ph:"🦪", price:780,  ja:"牡蠣フライ（5個）",  en:"Fried Oysters (5pc)", alias:["牡蠣フライ","牡蠣","かき","カキ","oyster","oysters"], ds:"広島県産の大粒牡蠣", dsEn:"Large Hiroshima oysters", reco:true},
+  {cat:"food",  id:"tempura", ph:"🍤", price:680,  ja:"小いわし天ぷら",     en:"Sardine Tempura",     alias:["小いわし天ぷら","小いわし","こいわし","いわし","天ぷら","tempura","sardine"], ds:"広島名物・7尾", dsEn:"Hiroshima specialty, 7 pieces"},
+  {cat:"food",  id:"yakitori",ph:"🍢", price:880,  ja:"焼き鳥盛り合わせ",   en:"Yakitori Platter",    alias:["焼き鳥盛り合わせ","焼き鳥","やきとり","焼鳥","yakitori"], ds:"5本盛り（タレ／塩）", dsEn:"5 skewers (sauce or salt)"},
+  {cat:"food",  id:"dashimaki",ph:"🍳",price:550,  ja:"だし巻き玉子",       en:"Dashimaki Omelet",    alias:["だし巻き玉子","だし巻き","だしまき","玉子","tamago","omelet"], ds:"ふわふわ・出汁香る", dsEn:"Fluffy rolled omelet with dashi"},
+  {cat:"food",  id:"okonomi", ph:"🥞", price:980,  ja:"広島お好み焼き",     en:"Hiroshima Okonomiyaki",alias:["広島お好み焼き","お好み焼き","おこのみやき","okonomiyaki"], ds:"そば入り・締めの一枚", dsEn:"With soba noodles — perfect finisher"},
+  {cat:"food",  id:"potato",  ph:"🍟", price:450,  ja:"ポテトフライ",       en:"French Fries",        alias:["ポテトフライ","ポテト","フライドポテト","fries","potato"], ds:"お子様にも人気", dsEn:"Popular with kids"},
+  {cat:"dessert",id:"icecream",ph:"🍨",price:380,  ja:"抹茶アイス",         en:"Matcha Ice Cream",    alias:["抹茶アイス","アイス","抹茶","ice cream","matcha"], ds:"食後にどうぞ", dsEn:"Perfect after your meal"},
+];
+const CATS = {ja:{drink:"お飲み物", food:"お料理", dessert:"デザート"}, en:{drink:"Drinks", food:"Food", dessert:"Dessert"}};
+
+/* ---------- 多言語テキスト ---------- */
+const T = {
+ja:{
+  placeholder:"メッセージを入力…", ttsOn:"🔊 読み上げ ON", ttsOff:"🔇 読み上げ OFF",
+  menuTitle:"メニュー", histTitle:"注文履歴", pickItems:"品を選んでください",
+  orderN:n=>`選択した ${n} 点を注文する`,
+  confirm:"確定", modify:"修正する", raiseHandBtn:"🖐 手を挙げる",
+  greetWalkin:"いらっしゃいませ。本日は何名様でご来店ですか？",
+  greetReserve:"山下様、本日はご予約ありがとうございます。ぜひ楽しんでいってくださいね。\nさっそくですが、お飲み物は何にされますか？",
+  partyChips:["1人","2人","3人","4人"],
+  askFirst:n=>`${n}名様ですね、ありがとうございます。当店は初めてですか？`,
+  yesNo:["はい","いいえ"],
+  explain:"簡単にご説明します。ご注文はこの画面で完結し、お会計はレジでのご精算となります。お困りのときは下の［🖐手を挙げる］を押してください。スタッフが伺います。アレルギーがある場合も、手を挙げてご相談ください。",
+  askDrink:"お飲み物は何にされますか？ テーブルの写真付きメニューもご覧ください。（画面下の［メニュー］からも選べます）",
+  welcomeBack:"いつもありがとうございます。お飲み物は何にされますか？",
+  repeatOrder:"ご注文の確認です。",
+  isThisOk:"こちらでよろしいですか？",
+  confirmed:"承りました。",
+  askDislike:"ところで、苦手な食べ物はありますか？ お料理のご提案の参考にさせていただきます。",
+  dislikeChips:["特にありません","パクチーが苦手","生ものが苦手"],
+  noDislike:"かしこまりました。",
+  gotDislike:d=>`承知しました。${d}を使わないお料理でご案内しますね。`,
+  askFood:reco=>`お料理は何にされますか？ 本日のおすすめは、瀬戸内の地魚の${reco}です。`,
+  askFoodAlt:"お料理は何にされますか？ 本日のおすすめは、広島県産の大粒牡蠣を使った牡蠣フライです。",
+  modifyMsg:"かしこまりました。ご注文をもう一度お聞かせください。",
+  enjoy:"ありがとうございます。ごゆっくりどうぞ。追加のご注文もいつでもどうぞ。",
+  handRaised:"スタッフをお呼びしました。テーブル5番までお伺いしますので、少々お待ちください。",
+  handSys:"🖐 店舗スタッフに通知しました（テーブル5）",
+  guardrail:"アレルギーや宗教上の食事制限に関わる内容は、誤りがあってはいけないため、スタッフが直接ご確認いたします。下の［🖐手を挙げる］ボタンを押していただくか、こちらからお呼びしますね。",
+  checkoutNone:"まだご注文をいただいていないようです。ぜひメニューをご覧ください。",
+  checkoutConfirm:"ご注文内容です。お間違いないですか？",
+  checkoutDone:"スタッフにお会計をお知らせしました。恐れ入りますが、レジにてご精算をお願いいたします。本日はありがとうございました。",
+  checkoutSys:"💴 店舗スタッフに「テーブル5 お会計」を通知しました",
+  paidNote:"※ 現金・キャッシュレスともレジでご精算いただけます",
+  recoAnswer:"本日のおすすめは、瀬戸内の地魚の刺身盛り合わせと、広島県産の牡蠣フライです。どちらも今朝仕入れたばかりです。",
+  hoursAnswer:"営業時間は17:00〜23:00（ラストオーダー22:15）、定休日は月曜日です。",
+  fallback:"申し訳ありません、うまくお聞き取りできませんでした。メニューの品名でお伝えいただくか、画面下の［メニュー］からもご注文いただけます。",
+  langChanged:"言語を日本語に切り替えました。引き続きご注文をどうぞ。",
+  total:"合計", subtotal:"小計", taxNote:"※ 価格は税込（イートイン10%）です",
+  histEmpty:"まだ注文はありません。",
+  menuOrdered:"（メニューから選択）",
+  micUnsupported:"このブラウザは音声入力に対応していません（Chrome推奨）",
+  micListening:"🎤 お話しください…",
+  descPrefix:"はい、",
+},
+en:{
+  placeholder:"Type a message…", ttsOn:"🔊 Voice ON", ttsOff:"🔇 Voice OFF",
+  menuTitle:"Menu", histTitle:"Order History", pickItems:"Select items",
+  orderN:n=>`Order ${n} selected item(s)`,
+  confirm:"Confirm", modify:"Change", raiseHandBtn:"🖐 Call Staff",
+  greetWalkin:"Welcome! How many people are in your party today?",
+  greetReserve:"Welcome back, Mr. Yamashita! Thank you for your reservation. Please enjoy your evening.\nNow, what would you like to drink?",
+  partyChips:["1 person","2 people","3 people","4 people"],
+  askFirst:n=>`Thank you, party of ${n}. Is this your first visit?`,
+  yesNo:["Yes","No"],
+  explain:"Let me briefly explain: you can complete your order on this screen, and payment is made at the register. If you need any help, please tap [🖐 Call Staff] below. Feel free to ask about allergies as well.",
+  askDrink:"What would you like to drink? Please also take a look at the photo menu on your table. (You can also use [Menu] below.)",
+  welcomeBack:"Welcome back! What would you like to drink?",
+  repeatOrder:"Let me confirm your order.",
+  isThisOk:"Is this correct?",
+  confirmed:"Certainly.",
+  askDislike:"By the way, are there any foods you dislike? We'll use this for our recommendations.",
+  dislikeChips:["Nothing in particular","No cilantro","No raw food"],
+  noDislike:"Understood.",
+  gotDislike:d=>`Got it. I'll recommend dishes without ${d}.`,
+  askFood:reco=>`What would you like to eat? Today's recommendation is the ${reco} — fresh local fish from the Seto Inland Sea.`,
+  askFoodAlt:"What would you like to eat? Today's recommendation is our Fried Oysters, made with large Hiroshima oysters.",
+  modifyMsg:"Of course. Please tell me your order again.",
+  enjoy:"Thank you! Enjoy your meal. Feel free to order more anytime.",
+  handRaised:"Staff has been called to table 5. Please wait a moment.",
+  handSys:"🖐 Staff notified (Table 5)",
+  guardrail:"For allergies or religious dietary restrictions, our staff will confirm directly with you to ensure accuracy. Please tap the [🖐 Call Staff] button below, or I can call them for you.",
+  checkoutNone:"You haven't ordered anything yet. Please take a look at our menu!",
+  checkoutConfirm:"Here is your order. Is everything correct?",
+  checkoutDone:"We've notified the staff. Please pay at the register. Thank you very much for coming today!",
+  checkoutSys:"💴 Staff notified: \"Table 5 — Check please\"",
+  paidNote:"※ Cash and cashless payments accepted at the register",
+  recoAnswer:"Today's recommendations are the Assorted Sashimi (local Seto Inland Sea fish) and the Fried Oysters from Hiroshima. Both arrived fresh this morning.",
+  hoursAnswer:"We're open 17:00–23:00 (last order 22:15), closed on Mondays.",
+  fallback:"I'm sorry, I didn't catch that. Please tell me the item name, or use the [Menu] button below.",
+  langChanged:"Language switched to English. Your language preference has been recorded. Please continue your order.",
+  total:"Total", subtotal:"Subtotal", taxNote:"※ Prices include 10% tax (eat-in)",
+  histEmpty:"No orders yet.",
+  menuOrdered:"(selected from menu)",
+  micUnsupported:"Voice input is not supported in this browser (Chrome recommended)",
+  micListening:"🎤 Listening…",
+  descPrefix:"Sure! ",
+}};
+
+/* ---------- 状態 ---------- */
+let lang = 'ja';
+let ttsOn = true;
+let demoMode = 'walkin';          // walkin | reserve
+let stage = 'party';              // party → firstVisit → order(自由会話)
+let askedDislike = false;
+let dislikes = [];
+let pending = [];                 // 復唱待ちの注文 [{item, qty}]
+let orders = [];                  // 確定済み [{item, qty, time}]
+let menuSel = {};                 // メニューシートの選択 {id: qty}
+let paid = false;
+
+const $ = id => document.getElementById(id);
+const chat = $('chat');
+const t = () => T[lang];
+
+/* ---------- 発話（読み上げ） ---------- */
+
+/* 読み間違い対策：TTSに渡す前にかな表記へ置換（画面表示は漢字のまま） */
+const SPEECH_READINGS = [
+  ["何名様","なんめいさま"],
+  ["何名","なんめい"],
+  ["生ビール","なまビール"],
+  ["賀茂鶴","かもつる"],
+  ["小いわし","こいわし"],
+  ["地魚","じざかな"],
+  ["人前","にんまえ"],
+  ["瀬戸内","せとうち"],
+  ["手を挙げる","てをあげる"],
+  ["一合","いちごう"],
+];
+
+/* 高品質な音声を優先選択（Edgeの自然音声 → Google音声 → 標準音声） */
+const VOICE_PRIORITY = {
+  ja: ["Nanami Online","Keita Online","Nanami","Google 日本語","Kyoko","Ayumi","Haruka","Ichiro"],
+  en: ["Aria Online","Jenny Online","Guy Online","Google US English","Samantha","Aria","Zira"]
+};
+let cachedVoices = [];
+function loadVoices(){ if('speechSynthesis' in window) cachedVoices = speechSynthesis.getVoices(); }
+loadVoices();
+if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = loadVoices;
+
+function pickVoice(){
+  const pref = lang==='ja' ? 'ja' : 'en';
+  const vs = cachedVoices.filter(v=>v.lang.toLowerCase().startsWith(pref));
+  for(const key of VOICE_PRIORITY[lang]){
+    const v = vs.find(v=>v.name.includes(key));
+    if(v) return v;
+  }
+  return vs[0] || null;
+}
+
+function speak(text){
+  if(!ttsOn || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  let clean = text.replace(/[🖐🍺🍽🍨💴🧾📖🌐🔊🔇🍶✕→（）\[\]［］]/g,' ').replace(/\s+/g,' ').trim();
+  if(!clean) return;
+  if(lang==='ja') SPEECH_READINGS.forEach(([k,v])=>{ clean = clean.split(k).join(v); });
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = lang==='ja' ? 'ja-JP' : 'en-US';
+  u.rate = 1.0;
+  u.pitch = 1.0;
+  const v = pickVoice();
+  if(v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+function toggleTTS(){
+  ttsOn = !ttsOn;
+  if(!ttsOn) speechSynthesis.cancel();
+  $('ttsBtn').textContent = ttsOn ? t().ttsOn : t().ttsOff;
+  $('ttsBtn').classList.toggle('off', !ttsOn);
+}
+
+/* ---------- チャット描画 ---------- */
+function addRow(role, html){
+  const row = document.createElement('div');
+  row.className = 'row ' + role;
+  if(role === 'ai'){
+    row.innerHTML = `<div class="avatar">🤖</div><div class="bubble">${html}</div>`;
+  }else{
+    row.innerHTML = `<div class="bubble">${html}</div>`;
+  }
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+  return row;
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+let typingRow = null;
+function showTyping(){
+  typingRow = addRow('ai','<span class="typing"><span></span><span></span><span></span></span>');
+}
+function hideTyping(){ if(typingRow){typingRow.remove(); typingRow=null;} }
+
+/* AI発話（タイピング演出つき） */
+function botSay(html, opts={}){
+  return new Promise(res=>{
+    showTyping();
+    setTimeout(()=>{
+      hideTyping();
+      addRow('ai', html);
+      if(opts.speak !== false) speak(opts.speakText || html.replace(/<[^>]+>/g,' '));
+      if(opts.chips) addChips(opts.chips);
+      if(opts.actions) addActions(opts.actions);
+      res();
+    }, opts.delay ?? 700);
+  });
+}
+function sysSay(text){ addRow('sys', text); }
+
+/* チップ（クイック返信） */
+let activeChips = null;
+function addChips(labels){
+  removeChips();
+  const div = document.createElement('div');
+  div.className = 'chips';
+  labels.forEach(lb=>{
+    const b = document.createElement('button');
+    b.textContent = lb;
+    b.onclick = ()=>{ removeChips(); handleUser(lb); };
+    div.appendChild(b);
+  });
+  chat.appendChild(div); activeChips = div;
+  chat.scrollTop = chat.scrollHeight;
+}
+function removeChips(){ if(activeChips){activeChips.remove(); activeChips=null;} }
+
+/* インライン操作ボタン（確定／修正／手を挙げる） */
+function addActions(list){
+  const div = document.createElement('div');
+  div.className = 'inline-actions';
+  list.forEach(a=>{
+    const b = document.createElement('button');
+    b.className = a.cls; b.textContent = a.label;
+    b.onclick = ()=>{ [...div.children].forEach(x=>x.disabled=true); a.fn(); };
+    div.appendChild(b);
+  });
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+/* ---------- 注文パース ---------- */
+function normalize(s){
+  return s.toLowerCase()
+    .replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[ａ-ｚＡ-Ｚ]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+}
+const KANJI_NUM = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,
+  'ひとつ':1,'ふたつ':2,'みっつ':3,'よっつ':4,'いつつ':5,
+  'one':1,'two':2,'three':3,'four':4,'five':5,'six':6};
+
+function findQty(text, start, end){
+  const after = text.slice(end, end+8);
+  let m = after.match(/^[をがものと、,.\s]*([0-9]+|[一二三四五六七八九十]|ひとつ|ふたつ|みっつ)\s*(つ|個|杯|人前|本|皿|枚|丁|合|,|、|$|\s)/);
+  if(m) return numVal(m[1]);
+  const before = text.slice(Math.max(0,start-10), start);
+  m = before.match(/([0-9]+|[一二三四五六七八九十]|two|three|four|five|one|a)\s*(つの|個の|杯の|人前の|)\s*$/);
+  if(m) return numVal(m[1]);
+  return 1;
+}
+function numVal(s){
+  if(/^[0-9]+$/.test(s)) return Math.min(parseInt(s),20);
+  return KANJI_NUM[s] || 1;
+}
+
+function parseOrder(raw){
+  const text = normalize(raw);
+  const found = [];
+  const used = [];
+  const entries = [];
+  MENU.forEach(item=>item.alias.forEach(a=>entries.push({item, a: normalize(a)})));
+  entries.sort((x,y)=>y.a.length-x.a.length);
+  entries.forEach(({item,a})=>{
+    let idx = 0;
+    while((idx = text.indexOf(a, idx)) !== -1){
+      const end = idx + a.length;
+      if(used.some(([s,e])=> idx<e && end>s)){ idx=end; continue; }
+      used.push([idx,end]);
+      const qty = findQty(text, idx, end);
+      const ex = found.find(f=>f.item.id===item.id);
+      if(ex) ex.qty = Math.max(ex.qty, qty); else found.push({item, qty});
+      idx = end;
+    }
+  });
+  return found;
+}
+
+/* 質問っぽさ判定（注文ではなく説明を求めている） */
+function isQuestion(text){
+  return /(どんな|何が|なにが|入って|説明|教えて|とは|って何|美味し|おいし|what|which|tell me|about)/.test(text);
+}
+
+/* ---------- 会話ハンドリング ---------- */
+function handleUser(raw){
+  const msg = raw.trim();
+  if(!msg) return;
+  removeChips();
+  addRow('user', esc(msg));
+  const text = normalize(msg);
+
+  /* ガードレール（仕様書 第6章）：アレルギー・宗教はAIが断定しない */
+  if(/(アレルギ|アレルゲン|宗教|ハラル|ハラール|ビーガン|ヴィーガン|ベジタリアン|allerg|halal|vegan|vegetarian|religio|kosher)/.test(text)){
+    botSay(esc(t().guardrail), {actions:[
+      {label:t().raiseHandBtn, cls:'btn-hand', fn:()=>raiseHand(true)}
+    ]});
+    return;
+  }
+
+  /* 会計キーワード */
+  if(/(会計|お勘定|チェック|check please|the check|the bill|pay now)/.test(text) && stage==='order'){
+    checkout(); return;
+  }
+
+  /* ステージ別 */
+  if(stage === 'party'){
+    const m = text.match(/([0-9]+|[一二三四五六七八九十]|ひとり|ふたり)/);
+    let n = 2;
+    if(m) n = m[1]==='ひとり'?1 : m[1]==='ふたり'?2 : numVal(m[1]);
+    stage = 'firstVisit';
+    botSay(esc(t().askFirst(n)), {chips:t().yesNo});
+    return;
+  }
+  if(stage === 'firstVisit'){
+    stage = 'order';
+    const yes = /^(はい|yes|初めて|first)/.test(text);
+    if(yes){
+      botSay(esc(t().explain)).then(()=> botSay(esc(t().askDrink)));
+    }else{
+      botSay(esc(t().welcomeBack));
+    }
+    return;
+  }
+  if(stage === 'dislike'){
+    stage = 'order';
+    if(/(特に|ない|なし|大丈夫|nothing|no$|none)/.test(text)){
+      botSay(esc(t().noDislike) + ' ' + esc(t().askFood(lang==='ja'?'刺身盛り合わせ':'Assorted Sashimi')));
+    }else{
+      const d = msg.replace(/(が苦手です|が苦手|は苦手|です|苦手|no |i don't like )/gi,'').trim() || msg;
+      dislikes.push(d);
+      const avoidSashimi = /(生|刺身|魚|さかな|raw|fish|sashimi)/.test(text);
+      const follow = avoidSashimi ? t().askFoodAlt : t().askFood(lang==='ja'?'刺身盛り合わせ':'Assorted Sashimi');
+      botSay(esc(t().gotDislike(d)) + '\n' + esc(follow));
+    }
+    return;
+  }
+
+  /* 説明の質問（品名＋疑問語） */
+  const items = parseOrder(msg);
+  if(items.length === 1 && isQuestion(text)){
+    const it = items[0].item;
+    const ds = lang==='ja' ? `${it.ja}は、${it.ds}です。おひとついかがですか？`
+                           : `${t().descPrefix}${it.en} — ${it.dsEn}. Would you like one?`;
+    botSay(esc(ds));
+    return;
+  }
+
+  /* おすすめ・営業時間などのFAQ */
+  if(/(おすすめ|オススメ|お勧め|recommend|人気|popular)/.test(text) && items.length===0){
+    botSay(esc(t().recoAnswer)); return;
+  }
+  if(/(営業時間|何時まで|定休|ラストオーダー|open|close|hours)/.test(text) && items.length===0){
+    botSay(esc(t().hoursAnswer)); return;
+  }
+
+  /* 注文（復唱 → 確定／修正 インライン表示：仕様書 5.1・C-08） */
+  if(items.length > 0){
+    pending = items;
+    repeatAndConfirm();
+    return;
+  }
+
+  /* フォールバック */
+  botSay(esc(t().fallback));
+}
+
+/* 復唱＋確定／修正 */
+function repeatAndConfirm(){
+  const lines = pending.map(p=>{
+    const nm = lang==='ja' ? p.item.ja : p.item.en;
+    const unit = p.item.unit;
+    const q = lang==='ja' ? (unit ? `${p.qty}${unit}` : `${p.qty}${p.item.cat==='drink'?'杯':'つ'}`) : `x${p.qty}`;
+    return `<div class="li"><span>${nm}　${q}</span><span>¥${(p.item.price*p.qty).toLocaleString()}</span></div>`;
+  }).join('');
+  const total = pending.reduce((s,p)=>s+p.item.price*p.qty,0);
+  const speakText = t().repeatOrder + ' ' +
+    pending.map(p=>`${lang==='ja'?p.item.ja:p.item.en} ${p.qty}`).join(', ') + '. ' + t().isThisOk;
+  botSay(
+    `${esc(t().repeatOrder)}<div class="order-list">${lines}<div class="li total"><span>${t().subtotal}</span><span>¥${total.toLocaleString()}</span></div></div>${esc(t().isThisOk)}`,
+    {
+      speakText,
+      actions:[
+        {label:t().confirm, cls:'btn-confirm', fn:confirmPending},
+        {label:t().modify,  cls:'btn-modify',  fn:()=>{ pending=[]; botSay(esc(t().modifyMsg)); }}
+      ]
+    }
+  );
+}
+
+function confirmPending(){
+  const time = new Date().toLocaleTimeString(lang==='ja'?'ja-JP':'en-US',{hour:'2-digit',minute:'2-digit'});
+  pending.forEach(p=>orders.push({...p, time}));
+  pending = [];
+  updateBadge();
+  if(!askedDislike){
+    askedDislike = true;
+    stage = 'dislike';
+    botSay(esc(t().confirmed) + ' ' + esc(t().askDislike), {chips:t().dislikeChips});
+  }else{
+    botSay(esc(t().enjoy));
+  }
+}
+
+/* ---------- 常時ボタン ---------- */
+function openSheet(name){
+  closeSheets();
+  if(name==='menu') renderMenu();
+  if(name==='history') renderHistory();
+  $('sheet-'+name).classList.add('open');
+}
+function closeSheets(){
+  document.querySelectorAll('.sheet-wrap').forEach(s=>s.classList.remove('open'));
+}
+document.querySelectorAll('.sheet-wrap').forEach(s=>{
+  s.addEventListener('click', e=>{ if(e.target===s) closeSheets(); });
+});
+
+/* メニューシート */
+function renderMenu(){
+  menuSel = {};
+  const body = $('menuBody');
+  let html = '';
+  ['drink','food','dessert'].forEach(cat=>{
+    html += `<div class="cat-title">${CATS[lang][cat]}</div>`;
+    MENU.filter(m=>m.cat===cat).forEach(m=>{
+      const nm = lang==='ja'?m.ja:m.en;
+      const ds = lang==='ja'?m.ds:m.dsEn;
+      const reco = m.reco ? (lang==='ja'?' ⭐おすすめ':' ⭐Recommended') : '';
+      html += `<div class="m-item">
+        <div class="ph">${m.ph}</div>
+        <div class="info"><div class="nm">${nm}</div><div class="ds">${ds}${reco}</div><div class="pr">¥${m.price.toLocaleString()}</div></div>
+        <div class="stepper">
+          <button onclick="stepItem('${m.id}',-1)">−</button>
+          <span class="cnt" id="cnt-${m.id}">0</span>
+          <button onclick="stepItem('${m.id}',1)">＋</button>
+        </div>
+      </div>`;
+    });
+  });
+  body.innerHTML = html;
+  updateMenuBar();
+}
+function stepItem(id, d){
+  menuSel[id] = Math.max(0, (menuSel[id]||0)+d);
+  $('cnt-'+id).textContent = menuSel[id];
+  updateMenuBar();
+}
+function updateMenuBar(){
+  const n = Object.values(menuSel).reduce((s,v)=>s+v,0);
+  const b = $('menuOrderBtn');
+  b.disabled = n===0;
+  b.textContent = n===0 ? t().pickItems : t().orderN(n);
+}
+function orderFromMenu(){
+  const sel = Object.entries(menuSel).filter(([,q])=>q>0);
+  if(!sel.length) return;
+  closeSheets();
+  pending = sel.map(([id,qty])=>({item: MENU.find(m=>m.id===id), qty}));
+  const msgTxt = pending.map(p=>{
+    const nm = lang==='ja'?p.item.ja:p.item.en;
+    return lang==='ja' ? `${nm}を${p.qty}` : `${p.qty} ${nm}`;
+  }).join(lang==='ja'?'、':', ') + ' ' + t().menuOrdered;
+  addRow('user', esc(msgTxt));
+  if(stage!=='order') stage='order';
+  repeatAndConfirm();
+}
+
+/* 注文履歴シート */
+function renderHistory(){
+  const body = $('histBody');
+  if(!orders.length){ body.innerHTML = `<div class="h-note">${t().histEmpty}</div>`; return; }
+  let html = '<div class="hist-card">';
+  let total = 0;
+  orders.forEach(o=>{
+    const nm = lang==='ja'?o.item.ja:o.item.en;
+    const amt = o.item.price*o.qty; total += amt;
+    html += `<div class="h-line"><span>${nm}<span class="q">×${o.qty}　${o.time}</span></span><span>¥${amt.toLocaleString()}</span></div>`;
+  });
+  html += '</div>';
+  html += `<div class="h-total"><span>${t().total}</span><span>¥${total.toLocaleString()}</span></div>`;
+  html += `<div class="h-note">${t().taxNote}</div>`;
+  body.innerHTML = html;
+}
+function updateBadge(){
+  const n = orders.reduce((s,o)=>s+o.qty,0);
+  const b = $('histBadge');
+  b.style.display = n? 'block':'none';
+  b.textContent = n;
+}
+
+/* 手を挙げる */
+function raiseHand(fromGuardrail){
+  closeSheets();
+  sysSay(t().handSys);
+  botSay(esc(t().handRaised));
+}
+
+/* お会計（仕様書 4.4：確認 → 確定 → 店側通知 → レジ精算） */
+function checkout(){
+  closeSheets();
+  if(paid) return;
+  if(!orders.length){ botSay(esc(t().checkoutNone)); return; }
+  const lines = orders.map(o=>{
+    const nm = lang==='ja'?o.item.ja:o.item.en;
+    return `<div class="li"><span>${nm}　×${o.qty}</span><span>¥${(o.item.price*o.qty).toLocaleString()}</span></div>`;
+  }).join('');
+  const total = orders.reduce((s,o)=>s+o.item.price*o.qty,0);
+  botSay(
+    `${esc(t().checkoutConfirm)}<div class="order-list">${lines}<div class="li total"><span>${t().total}</span><span>¥${total.toLocaleString()}</span></div></div>`,
+    {
+      speakText: t().checkoutConfirm + ' ' + t().total + ' ' + total + (lang==='ja'?'円':' yen'),
+      actions:[
+        {label:t().confirm, cls:'btn-confirm', fn:()=>{
+          sysSay(t().checkoutSys);
+          paid = true;
+          botSay(esc(t().checkoutDone) + '\n' + esc(t().paidNote));
+        }},
+        {label:t().modify, cls:'btn-modify', fn:()=>{
+          botSay(esc(lang==='ja'?'かしこまりました。追加・変更のご注文をどうぞ。確定後の取消は［🖐手を挙げる］でスタッフにご相談ください。':'Of course. Feel free to add items. To cancel a confirmed order, please use [🖐 Call Staff].'));
+        }}
+      ]
+    }
+  );
+}
+
+/* ---------- 言語切替（仕様書 第7章：接客言語＋分析タグの二役） ---------- */
+function setLang(l){
+  if(l===lang){ closeSheets(); return; }
+  lang = l;
+  applyLangUI();
+  closeSheets();
+  sysSay(l==='ja' ? '🌐 language: 日本語（オーダー情報に記録）' : '🌐 language: English (recorded for analytics)');
+  botSay(esc(t().langChanged));
+}
+function applyLangUI(){
+  $('msgInput').placeholder = t().placeholder;
+  $('ttsBtn').textContent = ttsOn ? t().ttsOn : t().ttsOff;
+  $('menuTitle').textContent = t().menuTitle;
+  $('histTitle').textContent = t().histTitle;
+  $('nvMenu').textContent = lang==='ja'?'メニュー':'Menu';
+  $('nvHistory').textContent = lang==='ja'?'注文履歴':'History';
+  $('nvHand').textContent = lang==='ja'?'手を挙げる':'Call Staff';
+  $('nvPay').textContent = lang==='ja'?'お会計':'Check';
+  $('hdTable').textContent = lang==='ja'?'テーブル 5 ｜ AI接客中':'Table 5 | AI Service';
+  $('lb-ja').classList.toggle('active', lang==='ja');
+  $('lb-en').classList.toggle('active', lang==='en');
+}
+
+/* ---------- 音声入力（デモ：Web Speech API／Chrome推奨） ---------- */
+let recog = null, recording = false;
+function toggleMic(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast(t().micUnsupported); return; }
+  if(recording){ recog.stop(); return; }
+  recog = new SR();
+  recog.lang = lang==='ja'?'ja-JP':'en-US';
+  recog.interimResults = false;
+  recording = true;
+  $('micBtn').classList.add('rec');
+  toast(t().micListening);
+  recog.onresult = e=>{
+    const txt = e.results[0][0].transcript;
+    $('msgInput').value = txt;
+    sendFromInput();
+  };
+  recog.onend = ()=>{ recording=false; $('micBtn').classList.remove('rec'); };
+  recog.onerror = e=>{
+    recording=false; $('micBtn').classList.remove('rec');
+    const ja = lang==='ja';
+    let msg;
+    switch(e.error){
+      case 'not-allowed':
+      case 'service-not-allowed':
+        if(location.protocol==='file:'){
+          msg = ja ? 'ファイル直接起動ではマイクを使えません。「デモ起動.bat」から開いてください'
+                   : 'Mic is blocked for local files. Please launch via the demo .bat file.';
+        }else{
+          msg = ja ? 'マイクの使用が許可されていません。アドレスバーのマイクアイコンから許可してください'
+                   : 'Microphone access denied. Please allow it in your browser settings.';
+        }
+        break;
+      case 'network':
+        msg = ja ? '音声認識にはインターネット接続が必要です' : 'Voice recognition requires an internet connection.';
+        break;
+      case 'no-speech':
+        msg = ja ? '音声が聞き取れませんでした。もう一度お試しください' : 'No speech detected. Please try again.';
+        break;
+      case 'audio-capture':
+        msg = ja ? 'マイクが見つかりません。接続をご確認ください' : 'No microphone found.';
+        break;
+      default:
+        msg = (ja ? '音声入力エラー: ' : 'Voice input error: ') + e.error;
+    }
+    toast(msg, 4000);
+  };
+  recog.start();
+}
+
+let toastTimer = null;
+function toast(msg, dur=2200){
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), dur);
+}
+
+/* ---------- 送信 ---------- */
+function sendFromInput(){
+  const v = $('msgInput').value.trim();
+  if(!v) return;
+  $('msgInput').value = '';
+  handleUser(v);
+}
+$('msgInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendFromInput(); });
+
+/* ---------- 起動・デモ切替 ---------- */
+function startSession(l){
+  lang = l;
+  applyLangUI();
+  $('splash').style.display = 'none';
+  beginConversation();
+}
+function beginConversation(){
+  if(demoMode === 'reserve'){
+    stage = 'order';
+    sysSay(lang==='ja' ? '👤 店側で「テーブル5 ＝ 予約：山下様」を紐付け済み（デモ）' : '👤 Table 5 linked to reservation: Mr. Yamashita (demo)');
+    botSay(esc(t().greetReserve), {delay:900});
+  }else{
+    stage = 'party';
+    botSay(esc(t().greetWalkin), {delay:900, chips:t().partyChips});
+  }
+}
+function restartDemo(mode){
+  demoMode = mode;
+  $('segWalkin').classList.toggle('on', mode==='walkin');
+  $('segReserve').classList.toggle('on', mode==='reserve');
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  chat.innerHTML = '';
+  stage='party'; askedDislike=false; dislikes=[]; pending=[]; orders=[]; paid=false;
+  updateBadge();
+  closeSheets();
+  beginConversation();
+}
+</script>
+</body>
+</html>
