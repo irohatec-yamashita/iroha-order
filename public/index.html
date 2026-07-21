@@ -3,17 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>居酒屋 いろは</title>
+    <title>IROHA Order</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main>
-      <div class="badge">IROHA Order · M1</div>
-      <h1 data-i18n="guestTitle"></h1>
-      <p data-i18n="guestMessage"></p>
-      <p data-i18n="guestHint"></p>
+    <main class="guest-app">
+      <header class="app-header"><div><p class="eyebrow">IROHA Order</p><h1 data-i18n="guestTitle"></h1></div><p id="table-label"></p></header>
+      <p id="table-missing" class="notice hidden" data-i18n="tableMissing"></p>
+      <section id="chat-log" class="chat-log" aria-live="polite"></section>
+      <section id="proposal-area" aria-live="polite"></section>
+      <form id="chat-form" class="composer"><input id="chat-input" autocomplete="off" required data-i18n-placeholder="inputPlaceholder"><button type="submit" data-i18n="send"></button></form>
+      <nav class="quick-actions" aria-label="Guest actions">
+        <button type="button" id="menu-button" data-i18n="menu"></button><button type="button" id="history-button" data-i18n="history"></button>
+        <button type="button" id="raise-button" data-i18n="raiseHand"></button><button type="button" id="language-button" data-i18n="language"></button><button type="button" id="check-button" data-i18n="check"></button>
+      </nav>
     </main>
-    <script src="/i18n.js"></script>
-    <script src="/app.js"></script>
+    <dialog id="menu-dialog"><article><header><h2 data-i18n="menuTitle"></h2><button type="button" class="dialog-close" data-i18n="close"></button></header><div id="menu-content"></div></article></dialog>
+    <dialog id="history-dialog"><article><header><h2 data-i18n="orderHistoryTitle"></h2><button type="button" class="dialog-close" data-i18n="close"></button></header><div id="history-content"></div></article></dialog>
+    <script src="/i18n.js"></script><script src="/app.js"></script>
   </body>
 </html>
