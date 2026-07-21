@@ -68,7 +68,7 @@ Guest scans a table QR (URL with table number) → chat opens → AI serves in n
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/chat` | `{table, lang, sessionState, messages[]}` → model reply `{text, proposal?}` |
+| `POST /api/chat` | `{table, lang, message}` or session event `{type:"guest_seated"}` → model reply `{text, chips, proposal?}` |
 | `POST /api/orders` | Confirm: `{table, items:[{id,qty}]}` → append to orders.json `{orderId, time, table, source:"guest", lines:[{id,name,qty,unit,subtotal}], status:"confirmed"}` |
 | `GET /api/orders?table=N` | Order history / totals |
 | `POST /api/events` | `{table, type:"raise_hand"|"check"}` → events.json |
@@ -96,4 +96,4 @@ If `SHEETS_WEBHOOK_URL` is set, POST confirmed orders (JSON) to the GAS webhook;
 
 ## 10. Non-goals (future work)
 
-Voice, reservations & personalized greeting, cancellations/sold-out toggle UI, payment integration & auto-reconciliation, per-language analytics, multi-restaurant tenancy, auth.
+Full-duplex GPT Realtime voice (the MVP uses OpenAI TTS), reservations & personalized greeting, cancellations/sold-out toggle UI, payment integration & auto-reconciliation, per-language analytics, multi-restaurant tenancy, auth.

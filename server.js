@@ -12,7 +12,7 @@ const {
   messagesForTable,
   sessionForTable
 } = require("./lib/session");
-const { appendEvent, closeOrdersForTable, createConfirmedOrder, ordersForTable } = require("./lib/store");
+const { appendEvent, closeOrdersForTable, createConfirmedOrder, ordersForTable, stateSnapshot } = require("./lib/store");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -60,6 +60,15 @@ function safeChatEvent(type, uiEvent) {
   const event = type || uiEvent;
   if (event && !chatEventTypes.has(event)) throw new Error("Unsupported chat event.");
   return event;
+}
+
+function safetyRedirectFor(message, lang = "ja") {
+  if (!message) return null;
+  const safetyPattern = /(?:アレルギー|食物(?:制限|アレルギー)|宗教(?:上|的)?(?:の)?(?:制限|理由)|ハラール|ヴィーガン|ビーガン|グルテン|allerg(?:y|ies|ic)|dietary restriction|halal|kosher|vegan|gluten)/i;
+  if (!safetyPattern.test(message.normalize("NFKC"))) return null;
+  return lang === "en"
+    ? "This is important, so a staff member will confirm it with you directly. Please tap the Raise Hand button."
+    : "大切なことですので、スタッフが直接確認いたします。🖐 手を挙げるボタンを押してください。";
 }
 
 function serviceAnswerFor(session, message) {
@@ -166,6 +175,20 @@ app.post("/api/chat", async (req, res) => {
       mirrorSheetEvent({ type: "conversation", sessionId: session.sessionId, table, lang, stage: session.stage, ...entry });
     }
 
+    const safetyText = safetyRedirectFor(guestMessage, lang);
+    if (safetyText) {
+      const entry = appendTranscript({ table, role: "assistant", content: safetyText });
+      mirrorSheetEvent({ type: "conversation", sessionId: session.sessionId, table, lang, stage: session.stage, ...entry });
+      return res.json({
+        text: safetyText,
+        chips: [],
+        proposal: null,
+        highlightRaiseHand: true,
+        sessionState: session,
+        checkout: null
+      });
+    }
+
     const menu = readMenu();
     const confirmed = ordersForTable(table);
     const categoryById = new Map(menu.items.map((item) => [item.id, item.cat]));
@@ -263,6 +286,15 @@ app.get("/api/orders", (req, res) => {
   res.json(ordersForTable(req.query.table));
 });
 
+app.get("/api/state", (_req, res) => {
+  try {
+    res.json(stateSnapshot());
+  } catch (error) {
+    console.error("State snapshot failed:", error);
+    res.status(500).json({ error: "Unable to load restaurant state." });
+  }
+});
+
 app.post("/api/events", (req, res) => {
   try {
     const { table, type } = req.body || {};
@@ -287,4 +319,4 @@ function startServer(listenPort = port) {
 
 if (require.main === module) startServer();
 
-module.exports = { app, serviceAnswerFor, startServer };
+module.exports = { app, safetyRedirectFor, serviceAnswerFor, startServer };

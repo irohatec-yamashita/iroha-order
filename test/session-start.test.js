@@ -79,9 +79,9 @@ global.fetch = async (url, options) => {
   };
 };
 
-const { app, serviceAnswerFor } = require("../server");
+const { app, safetyRedirectFor, serviceAnswerFor } = require("../server");
 const { resetSessions } = require("../lib/session");
-const { activeOrdersForTable, markOrdersCheckoutRequested } = require("../lib/store");
+const { activeOrdersForTable, buildStateSnapshot, markOrdersCheckoutRequested } = require("../lib/store");
 
 function request(server, { method = "GET", path, body }) {
   const address = server.address();
@@ -162,6 +162,15 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   assert.equal(food.sessionState.stage, "food");
   assert.ok(food.chips.some((chip) => /刺身|唐揚げ/.test(chip)));
 
+  const allergy = await chat(server, { table: "5", lang: "ja", message: "卵アレルギーがあります" });
+  assert.match(allergy.text, /スタッフが直接確認/);
+  assert.equal(allergy.highlightRaiseHand, true);
+  assert.equal(allergy.proposal, null);
+  assert.deepEqual(allergy.chips, []);
+  assert.equal(modelRequests.length, 6, "allergy guardrail must not call the model");
+  assert.match(safetyRedirectFor("I have a gluten allergy", "en"), /staff member/);
+  assert.equal(safetyRedirectFor("おすすめは？", "ja"), null);
+
   const speech = await request(server, { method: "POST", path: "/api/speech", body: { text: greeting.text, lang: "ja" } });
   assert.equal(speech.status, 200);
   assert.match(speech.headers["content-type"], /^audio\/mpeg/);
@@ -198,4 +207,30 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
     { table: "5", type: "check", time: "2026-07-21T10:00:00.000Z" }
   ], "5");
   assert.deepEqual(activeAfterLegacyCheck.map((order) => order.orderId), ["after"]);
+
+  const snapshot = buildStateSnapshot([
+    {
+      orderId: "new",
+      table: "5",
+      status: "confirmed",
+      time: "2026-07-21T11:00:00.000Z",
+      lines: [{ id: "beer", name: "生ビール", qty: 2, subtotal: 1200 }]
+    },
+    {
+      orderId: "checkout",
+      table: "6",
+      status: "checkout_requested",
+      time: "2026-07-21T08:00:00.000Z",
+      checkoutRequestedAt: "2026-07-21T12:00:00.000Z",
+      lines: [{ id: "sashimi", name: "刺身盛り合わせ", qty: 1, subtotal: 1580 }]
+    }
+  ], [
+    { eventId: "call", table: "5", type: "raise_hand", time: "2026-07-21T11:30:00.000Z" },
+    { eventId: "check", table: "6", type: "check", time: "2026-07-21T12:00:00.000Z" }
+  ]);
+  assert.equal(snapshot.tables.length, 2);
+  assert.equal(snapshot.tables.find((table) => table.table === "5").total, 1200);
+  assert.equal(snapshot.tables.find((table) => table.table === "6").status, "checkout");
+  assert.deepEqual(snapshot.orders.map((order) => order.orderId), ["new", "checkout"]);
+  assert.equal(snapshot.events[0].eventId, "check");
 });

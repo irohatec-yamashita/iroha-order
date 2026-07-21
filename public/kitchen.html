@@ -1,18 +1,38 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>居酒屋 いろは</title>
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <main>
-      <div class="badge">IROHA Order · M1</div>
-      <h1 data-i18n="kitchenTitle"></h1>
-      <p data-i18n="kitchenMessage"></p>
-    </main>
-    <script src="/i18n.js"></script>
-    <script src="/app.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IROHA Order | 厨房</title>
+  <style>
+    :root { color-scheme:dark; --bg:#101411; --panel:#1a201c; --line:#344039; --cream:#fff6df; --green:#62c493; --gold:#efbd59; --muted:#9eaaa3; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--cream); font-family:"Yu Gothic UI","Hiragino Sans",system-ui,sans-serif; }
+    header { position:sticky; top:0; z-index:2; background:#111914f2; backdrop-filter:blur(12px); border-bottom:1px solid var(--line); padding:18px clamp(16px,4vw,44px); display:flex; justify-content:space-between; align-items:center; }
+    h1 { margin:0; font-size:clamp(23px,3vw,34px); font-family:Georgia,serif; }
+    h1 span { color:var(--green); font:600 13px system-ui; margin-left:12px; }
+    #connection { color:var(--muted); font-size:13px; }
+    main { max-width:1500px; margin:0 auto; padding:26px clamp(14px,4vw,44px) 48px; }
+    .orders { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:16px; }
+    .ticket { background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 12px 30px #0004; }
+    .ticket-head { display:flex; justify-content:space-between; align-items:center; padding:14px 17px; background:#213127; border-bottom:1px solid var(--line); }
+    .table { color:var(--green); font-size:24px; font-weight:900; }
+    .time { color:var(--muted); font-size:13px; }
+    .lines { padding:12px 17px; }
+    .line { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:13px 0; border-bottom:1px dashed var(--line); font-size:18px; font-weight:700; }
+    .line:last-child { border-bottom:0; }
+    .qty { min-width:48px; text-align:center; background:var(--gold); color:#17130a; border-radius:8px; padding:6px 9px; font-size:21px; }
+    .ticket-foot { padding:10px 17px 14px; color:var(--muted); font-size:12px; }
+    .checkout { color:var(--gold); font-weight:700; }
+    .empty { border:1px dashed var(--line); border-radius:16px; color:var(--muted); padding:80px 20px; text-align:center; font-size:18px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IROHA Order <span>厨房ディスプレイ</span></h1>
+    <div id="connection">接続中</div>
+  </header>
+  <main><div id="orders" class="orders"><div class="empty">確定注文を待っています</div></div></main>
+  <script src="/kitchen.js" defer></script>
+</body>
 </html>

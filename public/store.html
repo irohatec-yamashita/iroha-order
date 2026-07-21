@@ -1,18 +1,73 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>居酒屋 いろは</title>
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body>
-    <main>
-      <div class="badge">IROHA Order · M1</div>
-      <h1 data-i18n="storeTitle"></h1>
-      <p data-i18n="storeMessage"></p>
-    </main>
-    <script src="/i18n.js"></script>
-    <script src="/app.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IROHA Order | 店舗</title>
+  <style>
+    :root { color-scheme: light; --ink:#1e2824; --muted:#6b746f; --paper:#f6f1e8; --card:#fffdf8; --line:#ded7cb; --green:#174d3b; --gold:#c9922f; --red:#a94435; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:"Yu Gothic UI","Hiragino Sans",system-ui,sans-serif; }
+    header { background:var(--green); color:white; padding:18px clamp(18px,4vw,48px); display:flex; justify-content:space-between; align-items:center; gap:18px; box-shadow:0 5px 18px #173f3228; }
+    .brand { display:flex; align-items:baseline; gap:12px; }
+    h1 { margin:0; font-family:Georgia,serif; font-size:clamp(23px,3vw,34px); letter-spacing:.04em; }
+    .brand span { color:#e6cf9e; font-size:13px; }
+    .connection { display:flex; align-items:center; gap:8px; font-size:13px; }
+    .dot { width:9px; height:9px; border-radius:50%; background:#7ad9a4; box-shadow:0 0 0 4px #7ad9a425; }
+    main { max-width:1400px; margin:0 auto; padding:28px clamp(16px,4vw,48px) 48px; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:26px; }
+    .stat { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
+    .stat b { display:block; margin-top:5px; font-size:28px; font-family:Georgia,serif; }
+    .stat small { color:var(--muted); }
+    .layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:24px; align-items:start; }
+    h2 { font-size:17px; margin:0 0 13px; }
+    .tables { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
+    .table-card, .event-panel { background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 7px 20px #2f3d3510; }
+    .table-card { padding:18px; border-top:5px solid var(--green); }
+    .table-card.checkout { border-top-color:var(--gold); }
+    .table-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .table-number { font-size:21px; font-weight:800; }
+    .status { border-radius:999px; padding:5px 9px; font-size:12px; font-weight:700; background:#e7f2ec; color:var(--green); }
+    .checkout .status { background:#fff0cb; color:#785009; }
+    .order { padding:13px 0; border-bottom:1px dashed var(--line); }
+    .line { display:flex; justify-content:space-between; gap:12px; margin:5px 0; font-size:14px; }
+    .total { display:flex; justify-content:space-between; align-items:end; padding-top:14px; font-weight:800; }
+    .total strong { font-size:22px; }
+    .time { color:var(--muted); font-size:12px; margin-top:12px; }
+    .event-panel { padding:18px; }
+    .event { display:grid; grid-template-columns:38px 1fr; gap:10px; padding:13px 0; border-bottom:1px solid var(--line); }
+    .event:last-child { border-bottom:0; }
+    .event-icon { width:36px; height:36px; border-radius:50%; display:grid; place-items:center; background:#f0ebe1; }
+    .event b { display:block; font-size:14px; }
+    .event small { color:var(--muted); }
+    .empty { background:var(--card); border:1px dashed var(--line); border-radius:18px; padding:40px 20px; color:var(--muted); text-align:center; }
+    .error { color:var(--red); }
+    @media (max-width:850px) { .stats { grid-template-columns:repeat(2,1fr); } .layout { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><h1>IROHA Order</h1><span>店舗モニター</span></div>
+    <div class="connection"><i class="dot" id="statusDot"></i><span id="connection">接続中</span></div>
+  </header>
+  <main>
+    <section class="stats" aria-label="店舗サマリー">
+      <div class="stat"><small>対応中テーブル</small><b id="activeCount">0</b></div>
+      <div class="stat"><small>注文中</small><b id="orderingCount">0</b></div>
+      <div class="stat"><small>お会計待ち</small><b id="checkoutCount">0</b></div>
+      <div class="stat"><small>呼び出し履歴</small><b id="callCount">0</b></div>
+    </section>
+    <div class="layout">
+      <section>
+        <h2>テーブル状況</h2>
+        <div id="tables" class="tables"><div class="empty">注文を待っています</div></div>
+      </section>
+      <aside>
+        <h2>最近の通知</h2>
+        <div id="events" class="event-panel"><div class="empty">通知はありません</div></div>
+      </aside>
+    </div>
+  </main>
+  <script src="/store.js" defer></script>
+</body>
 </html>
