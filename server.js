@@ -94,6 +94,10 @@ function serviceAnswerFor(session, message) {
 
 app.use(express.json({ limit: "100kb" }));
 
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 app.get("/api/menu", (_req, res) => {
   try {
     const menu = readMenu();

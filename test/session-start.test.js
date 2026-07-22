@@ -128,6 +128,10 @@ test("guest flow follows demo-ui hospitality stages while replies remain model-g
   assert.equal(page.status, 200);
   assert.match(page.text, /guest\.js/);
 
+  const health = await request(server, { path: "/healthz" });
+  assert.equal(health.status, 200);
+  assert.deepEqual(JSON.parse(health.text), { ok: true });
+
   const greeting = await chat(server, { table: "5", lang: "ja", type: "guest_seated" });
   assert.match(greeting.text, /何名様/);
   assert.equal(greeting.sessionState.stage, "party_size");

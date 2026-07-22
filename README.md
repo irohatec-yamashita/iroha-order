@@ -112,6 +112,12 @@ See `.env.example` for all options. Key values:
 - `VOICE_NAME`: fixed to one host voice (`marin` by default)
 - `SHEETS_WEBHOOK_URL`: optional; leave blank to use local JSON only
 
+## Deploy on Render
+
+This repository includes `render.yaml` for a Render Web Service. In Render, choose **New > Blueprint**, select this GitHub repository, and provide `OPENAI_API_KEY` only in the Render environment-variable prompt. Never commit it to GitHub.
+
+The deployed guest URL is `https://YOUR-SERVICE.onrender.com/index.html?table=5`; store and kitchen views are available at `/store.html` and `/kitchen.html`. The Free plan spins down after idle time and has an ephemeral filesystem, so its local order data resets after a restart. It is suitable for a public demo, not production persistence.
+
 ## Current limitations and next steps
 
 - Single-process, single-restaurant MVP with local JSON persistence and no authentication

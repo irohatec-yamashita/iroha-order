@@ -1,0 +1,22 @@
+services:
+  - type: web
+    runtime: node
+    name: iroha-order-demo
+    region: singapore
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MODEL
+        value: gpt-5.6
+      - key: REASONING_EFFORT
+        value: low
+      - key: VOICE_MODEL
+        value: gpt-4o-mini-tts-2025-12-15
+      - key: VOICE_NAME
+        value: marin
